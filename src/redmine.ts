@@ -106,7 +106,7 @@ export class RedmineClient {
 
     async getIssue(
         issueId: number,
-        options: GetIssueOptions = {}
+        options: GetIssueOptions = {},
     ): Promise<RedmineIssue> {
         // Build include params - journals always included
         const includes = ["journals"];
@@ -122,13 +122,13 @@ export class RedmineClient {
             method: "GET",
             headers: {
                 "X-Redmine-API-Key": this.config.redmineApiKey,
-                Accept: "application/json",
+                "Accept": "application/json",
             },
         });
 
         if (!response.ok) {
             throw new Error(
-                `Failed to fetch issue ${issueId}: ${response.status} ${response.statusText}`
+                `Failed to fetch issue ${issueId}: ${response.status} ${response.statusText}`,
             );
         }
 

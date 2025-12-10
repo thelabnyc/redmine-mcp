@@ -30,6 +30,7 @@ Tests use vitest with in-memory MCP transports. The pattern creates a linked cli
 ### Adding New MCP Tools
 
 Register tools in `createServer()` using `server.registerTool()` with:
+
 1. Tool name (string)
 2. Tool metadata (title, description, inputSchema using zod)
 3. Handler function returning `{ content: [...] }` or `{ isError: true, content: [...] }`

@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createServer } from "./server.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { RedmineIssue } from "./redmine.js";
+import { createServer } from "./server.js";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -102,7 +103,7 @@ async function createTestClientServer() {
 
 function getTextContent(result: ToolResult): string {
     const textContent = result.content.find(
-        (c): c is TextContent => c.type === "text"
+        (c): c is TextContent => c.type === "text",
     );
     if (!textContent) {
         throw new Error("No text content found");
@@ -151,12 +152,12 @@ describe("Redmine MCP Server", () => {
                     RequestInit,
                 ];
                 expect(url).toBe(
-                    "https://test.redmine.com/issues/12345.json?include=journals"
+                    "https://test.redmine.com/issues/12345.json?include=journals",
                 );
                 expect(
                     (options.headers as Record<string, string>)[
                         "X-Redmine-API-Key"
-                    ]
+                    ],
                 ).toBe("test-api-key");
 
                 // Verify response structure
@@ -171,7 +172,7 @@ describe("Redmine MCP Server", () => {
                 expect(issueData.id).toBe(12345);
                 expect(issueData.subject).toBe("Test issue subject");
                 expect(issueData.description).toBe(
-                    "This is a test issue description"
+                    "This is a test issue description",
                 );
                 expect(issueData.project.name).toBe("Test Project");
                 expect(issueData.status.name).toBe("New");
@@ -184,10 +185,10 @@ describe("Redmine MCP Server", () => {
                 expect(issueData.journals).toBeDefined();
                 expect(issueData.journals).toHaveLength(2);
                 expect(issueData.journals?.[0].notes).toBe(
-                    "Added initial description"
+                    "Added initial description",
                 );
                 expect(issueData.journals?.[1].notes).toBe(
-                    "Working on this now"
+                    "Working on this now",
                 );
             } finally {
                 await cleanup();
@@ -212,7 +213,7 @@ describe("Redmine MCP Server", () => {
                 // Verify the # was stripped from the URL
                 const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
                 expect(url).toBe(
-                    "https://test.redmine.com/issues/12345.json?include=journals"
+                    "https://test.redmine.com/issues/12345.json?include=journals",
                 );
             } finally {
                 await cleanup();
@@ -251,7 +252,7 @@ describe("Redmine MCP Server", () => {
                 expect(issueData.attachments).toBeDefined();
                 expect(issueData.attachments).toHaveLength(1);
                 expect(issueData.attachments?.[0].filename).toBe(
-                    "screenshot.png"
+                    "screenshot.png",
                 );
             } finally {
                 await cleanup();
