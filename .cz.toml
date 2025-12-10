@@ -10,6 +10,7 @@ version_provider = "npm"
 version_scheme = "semver"
 version_files = [
     "package.json:version",
+    "src/server.ts:version",
 ]
 pre_bump_hooks = [
     "npm i",

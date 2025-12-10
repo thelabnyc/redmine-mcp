@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod";
 
 import type { RedmineClient } from "../redmine.js";
+import { parseIssueId } from "./utils.js";
 
 export function registerGetIssueTool(
     server: McpServer,
@@ -43,23 +44,20 @@ export function registerGetIssueTool(
             includeChildren,
         }) => {
             try {
-                // Strip # prefix if present and parse as number
-                const cleanId = issueId.replace(/^#/, "");
-                const numericId = parseInt(cleanId, 10);
-
-                if (isNaN(numericId)) {
+                const parsed = parseIssueId(issueId);
+                if (!parsed.success) {
                     return {
                         isError: true,
                         content: [
                             {
                                 type: "text" as const,
-                                text: `Invalid issue ID: ${issueId}`,
+                                text: parsed.error,
                             },
                         ],
                     };
                 }
 
-                const issue = await redmineClient.getIssue(numericId, {
+                const issue = await redmineClient.getIssue(parsed.numericId, {
                     includeAttachments,
                     includeWatchers,
                     includeRelations,

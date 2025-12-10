@@ -214,6 +214,22 @@ export class RedmineClient {
         this.config = config;
     }
 
+    /**
+     * Extract error details from a failed response body
+     */
+    private async extractErrorDetails(response: Response): Promise<string> {
+        try {
+            const body = (await response.json()) as { errors?: string[] };
+            if (body.errors && Array.isArray(body.errors)) {
+                return ` - ${body.errors.join(", ")}`;
+            }
+            return "";
+        } catch {
+            // Response body is not JSON or couldn't be parsed
+            return "";
+        }
+    }
+
     async getIssue(
         issueId: number,
         options: GetIssueOptions = {},
@@ -237,8 +253,9 @@ export class RedmineClient {
         });
 
         if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
             throw new Error(
-                `Failed to fetch issue ${issueId}: ${response.status} ${response.statusText}`,
+                `Failed to fetch issue ${issueId}: ${response.status} ${response.statusText}${errorDetails}`,
             );
         }
 
@@ -263,8 +280,9 @@ export class RedmineClient {
         });
 
         if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
             throw new Error(
-                `Failed to update issue ${issueId}: ${response.status} ${response.statusText}`,
+                `Failed to update issue ${issueId}: ${response.status} ${response.statusText}${errorDetails}`,
             );
         }
 
@@ -288,8 +306,9 @@ export class RedmineClient {
         });
 
         if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
             throw new Error(
-                `Failed to create time entry: ${response.status} ${response.statusText}`,
+                `Failed to create time entry: ${response.status} ${response.statusText}${errorDetails}`,
             );
         }
 
@@ -309,8 +328,9 @@ export class RedmineClient {
         });
 
         if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
             throw new Error(
-                `Failed to fetch time entry activities: ${response.status} ${response.statusText}`,
+                `Failed to fetch time entry activities: ${response.status} ${response.statusText}${errorDetails}`,
             );
         }
 
@@ -347,8 +367,9 @@ export class RedmineClient {
         });
 
         if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
             throw new Error(
-                `Failed to fetch project members: ${response.status} ${response.statusText}`,
+                `Failed to fetch project members: ${response.status} ${response.statusText}${errorDetails}`,
             );
         }
 
@@ -373,8 +394,9 @@ export class RedmineClient {
         });
 
         if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
             throw new Error(
-                `Failed to fetch issue statuses: ${response.status} ${response.statusText}`,
+                `Failed to fetch issue statuses: ${response.status} ${response.statusText}${errorDetails}`,
             );
         }
 
@@ -394,8 +416,9 @@ export class RedmineClient {
         });
 
         if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
             throw new Error(
-                `Failed to fetch current user: ${response.status} ${response.statusText}`,
+                `Failed to fetch current user: ${response.status} ${response.statusText}${errorDetails}`,
             );
         }
 

@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod";
 
 import type { RedmineClient } from "../redmine.js";
+import { parseIssueId } from "./utils.js";
 
 export function registerUpdateIssueTool(
     server: McpServer,
@@ -42,10 +43,12 @@ export function registerUpdateIssueTool(
                     .describe("Parent issue ID"),
                 startDate: z
                     .string()
+                    .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
                     .optional()
                     .describe("Start date (YYYY-MM-DD format)"),
                 dueDate: z
                     .string()
+                    .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
                     .optional()
                     .describe("Due date (YYYY-MM-DD format)"),
                 doneRatio: z
@@ -83,6 +86,7 @@ export function registerUpdateIssueTool(
                     .describe("Comments for the time entry"),
                 logSpentOn: z
                     .string()
+                    .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
                     .optional()
                     .describe(
                         "Date for time entry (YYYY-MM-DD, defaults to today)",
@@ -110,21 +114,19 @@ export function registerUpdateIssueTool(
             logSpentOn,
         }) => {
             try {
-                // Strip # prefix if present and parse as number
-                const cleanId = issueId.replace(/^#/, "");
-                const numericId = parseInt(cleanId, 10);
-
-                if (isNaN(numericId)) {
+                const parsed = parseIssueId(issueId);
+                if (!parsed.success) {
                     return {
                         isError: true,
                         content: [
                             {
                                 type: "text" as const,
-                                text: `Invalid issue ID: ${issueId}`,
+                                text: parsed.error,
                             },
                         ],
                     };
                 }
+                const numericId = parsed.numericId;
 
                 // Build update data (convert camelCase to snake_case)
                 const updateData: Record<string, unknown> = {};
