@@ -1,0 +1,11 @@
+## v0.1.0 (2025-12-10)
+
+### Feat
+
+- add update-issue, list-project-members, list-issue-statuses, and whoami tools
+- add get-issue tool
+- initial commit
+
+### Refactor
+
+- code review tweaks
