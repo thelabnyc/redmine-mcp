@@ -10,8 +10,7 @@ export default getTSConfig({
     parserOptions: {
         tsconfigRootDir: __dirname,
         projectService: {
-            allowDefaultProject: ["*.test.ts", "src/*.test.ts"],
-            defaultProject: "./tsconfig.eslint.json",
+            defaultProject: "./tsconfig.json",
         },
     },
 });

@@ -5,6 +5,10 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 ## Features
 
 - Fetch issue details by ID, including subject, description, status, priority, and assignee
+- Update issues: change status, assign users, add notes, and more
+- Log time spent on issues with integrated time tracking
+- List project members to find user IDs for assignments
+- List available issue statuses to find valid status IDs
 - Retrieve change history (journals) with every request
 - Optionally include attachments, watchers, relations, and child issues
 
@@ -125,6 +129,79 @@ Fetch details about a Redmine issue by ID.
 Or:
 
 > "What's the status of issue 6789? Include any attachments."
+
+### update-issue
+
+Update a Redmine issue. Can change fields, add notes, and log time spent.
+
+**Parameters:**
+
+| Parameter        | Type    | Required | Description                                          |
+| ---------------- | ------- | -------- | ---------------------------------------------------- |
+| `issueId`        | string  | Yes      | Issue ID (e.g., `#12345` or `12345`)                 |
+| `subject`        | string  | No       | New issue subject/title                              |
+| `description`    | string  | No       | New issue description                                |
+| `statusId`       | number  | No       | Status ID to set                                     |
+| `priorityId`     | number  | No       | Priority ID to set                                   |
+| `assignedToId`   | number  | No       | User ID to assign (use 0 to unassign)                |
+| `trackerId`      | number  | No       | Tracker ID to set                                    |
+| `parentIssueId`  | number  | No       | Parent issue ID                                      |
+| `startDate`      | string  | No       | Start date (YYYY-MM-DD format)                       |
+| `dueDate`        | string  | No       | Due date (YYYY-MM-DD format)                         |
+| `doneRatio`      | number  | No       | Percent done (0-100)                                 |
+| `estimatedHours` | number  | No       | Estimated hours for the issue                        |
+| `notes`          | string  | No       | Comment/note to add to the issue journal             |
+| `privateNotes`   | boolean | No       | Make the notes private                               |
+| `logHours`       | number  | No       | Hours to log as a time entry                         |
+| `logActivityId`  | number  | No       | Activity ID for time entry (uses default if omitted) |
+| `logComments`    | string  | No       | Comments for the time entry                          |
+| `logSpentOn`     | string  | No       | Date for time entry (YYYY-MM-DD, defaults to today)  |
+
+**Example usage in Claude:**
+
+> "Update issue #12345 to status 2 and assign to user 5"
+
+Or:
+
+> "Add a note to issue #6789 saying 'Fixed the bug' and log 1.5 hours"
+
+Or:
+
+> "Mark issue #12345 as 75% done and log 2 hours of development time"
+
+### list-project-members
+
+List all members of a Redmine project. Use this to find user IDs for assigning issues.
+
+**Parameters:**
+
+| Parameter   | Type   | Required | Description                                          |
+| ----------- | ------ | -------- | ---------------------------------------------------- |
+| `projectId` | string | Yes      | Project ID or identifier (e.g., `my-project` or `1`) |
+| `limit`     | number | No       | Maximum number of members to return (default 25)     |
+| `offset`    | number | No       | Number of members to skip for pagination             |
+
+**Example usage in Claude:**
+
+> "List all members of the 'my-project' project"
+
+Or:
+
+> "Who can I assign issues to in project #1?"
+
+### list-issue-statuses
+
+List all available issue statuses. Use this to find valid status IDs when updating issues.
+
+**Parameters:** None
+
+**Example usage in Claude:**
+
+> "What statuses can I set for issues?"
+
+Or:
+
+> "List the available issue statuses so I can update issue #123"
 
 ## Development
 
