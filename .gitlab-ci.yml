@@ -15,12 +15,12 @@ variables:
   NPM_CONFIG_PROVENANCE: "false"
 
 include:
-  - component: gitlab.com/thelabnyc/thelab-ci-components/review@0.6.1
-  - component: gitlab.com/thelabnyc/thelab-ci-components/precommit@0.6.1
+  - component: gitlab.com/thelabnyc/thelab-ci-components/review@0.6.2
+  - component: gitlab.com/thelabnyc/thelab-ci-components/precommit@0.6.2
     inputs:
-      image: registry.gitlab.com/thelabnyc/python:3.13.960-node24@sha256:9cb82ee53bc8ad2d7fea12d10f6e3583b6a0924dbaab4bb51b52605396017475
-  - component: gitlab.com/thelabnyc/thelab-ci-components/publish-gitlab-release@0.6.1
-  - component: gitlab.com/thelabnyc/thelab-ci-components/publish-to-npm@0.6.1
+      image: registry.gitlab.com/thelabnyc/python:3.14-node24@sha256:1f6abc60720166cbe46f8ba09d31aa052338809ec8383b9b84ea23671775378b
+  - component: gitlab.com/thelabnyc/thelab-ci-components/publish-gitlab-release@0.6.2
+  - component: gitlab.com/thelabnyc/thelab-ci-components/publish-to-npm@0.6.2
 
 test:
   stage: test
@@ -34,7 +34,6 @@ test:
     - npm run test
   parallel:
     matrix:
-      - IMAGE: node:22
       - IMAGE: node:24
   cache:
     key: "${CI_PROJECT_NAME}-test-${IMAGE}"

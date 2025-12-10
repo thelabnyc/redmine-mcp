@@ -3,7 +3,9 @@
     "compilerOptions": {
         "declaration": true,
         "outDir": "dist",
-        "sourceMap": true
+        "sourceMap": true,
+        "strict": true
     },
-    "include": ["src"]
+    "include": ["src"],
+    "exclude": ["src/**/*.test.ts"]
 }
