@@ -1,0 +1,42 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_REF_PROTECTED == "true"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+stages:
+  - test
+  - release
+
+variables:
+  # We have to disable sigstore for now since NPM currently only supports
+  # provenance when publishing from a gitlab-hosted runner. Hopefully we can
+  # enable this in the future once they drop this limitation (which should be
+  # possible since PyPI has no such limitation on their use of sigstore).
+  NPM_CONFIG_PROVENANCE: "false"
+
+include:
+  - component: gitlab.com/thelabnyc/thelab-ci-components/review@0.6.1
+  - component: gitlab.com/thelabnyc/thelab-ci-components/precommit@0.6.1
+    inputs:
+      image: registry.gitlab.com/thelabnyc/python:3.13.960-node24@sha256:9cb82ee53bc8ad2d7fea12d10f6e3583b6a0924dbaab4bb51b52605396017475
+  - component: gitlab.com/thelabnyc/thelab-ci-components/publish-gitlab-release@0.6.1
+  - component: gitlab.com/thelabnyc/thelab-ci-components/publish-to-npm@0.6.1
+
+test:
+  stage: test
+  image: "${IMAGE}"
+  variables:
+    NODE_ENV: development
+  script:
+    - npm ci
+    - npm run lint
+    - npm run build
+    - npm run test
+  parallel:
+    matrix:
+      - IMAGE: node:22
+      - IMAGE: node:24
+  cache:
+    key: "${CI_PROJECT_NAME}-test-${IMAGE}"
+    paths:
+      - node_modules
