@@ -116,7 +116,8 @@ describe("get-issue tool", () => {
             expect(result.content.length).toBeGreaterThan(0);
 
             // Parse the response
-            const issueData = parseIssueResult(result);
+            const responseData = parseIssueResult(result);
+            const issueData = responseData.issue;
 
             // Verify issue fields
             expect(issueData.id).toBe(12345);
@@ -138,6 +139,12 @@ describe("get-issue tool", () => {
                 "Added initial description",
             );
             expect(issueData.journals?.[1].notes).toBe("Working on this now");
+
+            // Verify journal pagination metadata
+            expect(responseData.journalPagination).toBeDefined();
+            expect(responseData.journalPagination?.total_count).toBe(2);
+            expect(responseData.journalPagination?.offset).toBe(0);
+            expect(responseData.journalPagination?.limit).toBe(5);
         } finally {
             await cleanup();
         }
@@ -196,10 +203,12 @@ describe("get-issue tool", () => {
 
             // Verify response includes attachments
             expect(result.isError).toBeFalsy();
-            const issueData = parseIssueResult(result);
-            expect(issueData.attachments).toBeDefined();
-            expect(issueData.attachments).toHaveLength(1);
-            expect(issueData.attachments?.[0].filename).toBe("screenshot.png");
+            const responseData = parseIssueResult(result);
+            expect(responseData.issue.attachments).toBeDefined();
+            expect(responseData.issue.attachments).toHaveLength(1);
+            expect(responseData.issue.attachments?.[0].filename).toBe(
+                "screenshot.png",
+            );
         } finally {
             await cleanup();
         }
@@ -244,6 +253,114 @@ describe("get-issue tool", () => {
             expect(result.isError).toBe(true);
             const errorText = getTextContent(result);
             expect(errorText).toContain("Network error");
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it("paginates journals with limit and offset", async () => {
+        // Create an issue with many journals
+        const manyJournals = Array.from({ length: 50 }, (_, i) => ({
+            id: i + 1,
+            user: { id: 1, name: "John Doe" },
+            notes: `Journal entry ${i + 1}`,
+            created_on: "2024-01-15T10:00:00Z",
+            details: [],
+        }));
+
+        const issueWithManyJournals = {
+            issue: {
+                ...sampleIssueResponse.issue,
+                journals: manyJournals,
+            },
+        };
+
+        mockFetch.mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(issueWithManyJournals),
+        });
+
+        const { client, cleanup } = await createTestClientServer();
+
+        try {
+            const result = (await client.callTool({
+                name: "get-issue",
+                arguments: {
+                    issueId: "12345",
+                    journalLimit: 10,
+                    journalOffset: 5,
+                },
+            })) as ToolResult;
+
+            expect(result.isError).toBeFalsy();
+            const responseData = parseIssueResult(result);
+
+            // Should return only 10 journals starting from offset 5
+            expect(responseData.issue.journals).toHaveLength(10);
+            expect(responseData.issue.journals?.[0].notes).toBe(
+                "Journal entry 6",
+            );
+            expect(responseData.issue.journals?.[9].notes).toBe(
+                "Journal entry 15",
+            );
+
+            // Pagination metadata should reflect the full count
+            expect(responseData.journalPagination?.total_count).toBe(50);
+            expect(responseData.journalPagination?.offset).toBe(5);
+            expect(responseData.journalPagination?.limit).toBe(10);
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it("applies default journal limit of 10", async () => {
+        // Create an issue with 50 journals
+        const manyJournals = Array.from({ length: 50 }, (_, i) => ({
+            id: i + 1,
+            user: { id: 1, name: "John Doe" },
+            notes: `Journal entry ${i + 1}`,
+            created_on: "2024-01-15T10:00:00Z",
+            details: [],
+        }));
+
+        const issueWithManyJournals = {
+            issue: {
+                ...sampleIssueResponse.issue,
+                journals: manyJournals,
+            },
+        };
+
+        mockFetch.mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(issueWithManyJournals),
+        });
+
+        const { client, cleanup } = await createTestClientServer();
+
+        try {
+            const result = (await client.callTool({
+                name: "get-issue",
+                arguments: { issueId: "12345" },
+            })) as ToolResult;
+
+            expect(result.isError).toBeFalsy();
+            const responseData = parseIssueResult(result);
+
+            // Should return only first 5 journals by default
+            expect(responseData.issue.journals).toHaveLength(5);
+            expect(responseData.issue.journals?.[0].notes).toBe(
+                "Journal entry 1",
+            );
+            expect(responseData.issue.journals?.[4].notes).toBe(
+                "Journal entry 5",
+            );
+
+            // Pagination metadata should show total count
+            expect(responseData.journalPagination?.total_count).toBe(50);
+            expect(responseData.journalPagination?.offset).toBe(0);
+            expect(responseData.journalPagination?.limit).toBe(5);
         } finally {
             await cleanup();
         }

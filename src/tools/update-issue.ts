@@ -196,7 +196,8 @@ export function registerUpdateIssueTool(
 
                 // Build response
                 const response: Record<string, unknown> = {
-                    issue: updatedIssue,
+                    issue: updatedIssue.issue,
+                    journalPagination: updatedIssue.journalPagination,
                 };
                 if (timeEntry) {
                     response.time_entry = timeEntry;

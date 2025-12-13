@@ -118,6 +118,18 @@ export interface GetIssueOptions {
     includeWatchers?: boolean;
     includeRelations?: boolean;
     includeChildren?: boolean;
+    journalLimit?: number;
+    journalOffset?: number;
+}
+
+export interface GetIssueResult {
+    issue: RedmineIssue;
+    journalPagination?: {
+        total_count: number;
+        offset: number;
+        limit: number;
+        hint?: string;
+    };
 }
 
 // Update Issue types
@@ -233,7 +245,9 @@ export class RedmineClient {
     async getIssue(
         issueId: number,
         options: GetIssueOptions = {},
-    ): Promise<RedmineIssue> {
+    ): Promise<GetIssueResult> {
+        const DEFAULT_JOURNAL_LIMIT = 5;
+
         // Build include params - journals always included
         const includes = ["journals"];
         if (options.includeAttachments) includes.push("attachments");
@@ -260,13 +274,36 @@ export class RedmineClient {
         }
 
         const data = (await response.json()) as RedmineIssueResponse;
-        return data.issue;
+        const issue = data.issue;
+
+        // Apply journal pagination
+        const allJournals = issue.journals ?? [];
+        const totalCount = allJournals.length;
+        const offset = options.journalOffset ?? 0;
+        const limit = options.journalLimit ?? DEFAULT_JOURNAL_LIMIT;
+
+        issue.journals = allJournals.slice(offset, offset + limit);
+
+        const returnedCount = issue.journals.length;
+        const hasMore = offset + returnedCount < totalCount;
+
+        return {
+            issue,
+            journalPagination: {
+                total_count: totalCount,
+                offset,
+                limit,
+                ...(hasMore && {
+                    hint: `Only ${returnedCount} of ${totalCount} journal entries returned. Fetch remaining entries before drawing conclusions about this issue's history.`,
+                }),
+            },
+        };
     }
 
     async updateIssue(
         issueId: number,
         data: UpdateIssueData,
-    ): Promise<RedmineIssue> {
+    ): Promise<GetIssueResult> {
         const url = `${this.config.redmineUrl}/issues/${issueId}.json`;
 
         const response = await fetch(url, {
