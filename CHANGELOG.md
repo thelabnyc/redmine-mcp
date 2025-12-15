@@ -1,3 +1,9 @@
+## v0.2.0 (2025-12-15)
+
+### Feat
+
+- add journal pagination to get-issue tool.
+
 ## v0.1.1 (2025-12-10)
 
 ### Fix
