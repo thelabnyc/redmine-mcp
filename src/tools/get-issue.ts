@@ -13,7 +13,7 @@ export function registerGetIssueTool(
         {
             title: "Get Redmine Issue",
             description:
-                "Fetch details about a Redmine issue by ID. Returns issue information including subject, description, status, priority, assignee, and change history (journals).",
+                "Fetch details about a Redmine issue by ID. Returns issue information including subject, description, status, priority, assignee, and change history (journals). Journals are paginated - use journalLimit and journalOffset to fetch more. IMPORTANT: Keep journalLimit at 10 or less to avoid response truncation. Fetch journals in small batches.",
             inputSchema: {
                 issueId: z
                     .string()
@@ -34,6 +34,18 @@ export function registerGetIssueTool(
                     .boolean()
                     .optional()
                     .describe("Include child issues"),
+                journalLimit: z
+                    .number()
+                    .optional()
+                    .describe(
+                        "Maximum number of journal entries to return (default 5)",
+                    ),
+                journalOffset: z
+                    .number()
+                    .optional()
+                    .describe(
+                        "Number of journal entries to skip for pagination (default 0)",
+                    ),
             },
         },
         async ({
@@ -42,6 +54,8 @@ export function registerGetIssueTool(
             includeWatchers,
             includeRelations,
             includeChildren,
+            journalLimit,
+            journalOffset,
         }) => {
             try {
                 const parsed = parseIssueId(issueId);
@@ -57,18 +71,20 @@ export function registerGetIssueTool(
                     };
                 }
 
-                const issue = await redmineClient.getIssue(parsed.numericId, {
+                const result = await redmineClient.getIssue(parsed.numericId, {
                     includeAttachments,
                     includeWatchers,
                     includeRelations,
                     includeChildren,
+                    journalLimit,
+                    journalOffset,
                 });
 
                 return {
                     content: [
                         {
                             type: "text" as const,
-                            text: JSON.stringify(issue, null, 2),
+                            text: JSON.stringify(result, null, 2),
                         },
                     ],
                 };

@@ -3,6 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { vi } from "vitest";
 
 import type {
+    GetIssueResult,
     RedmineCurrentUser,
     RedmineIssue,
     RedmineIssueStatusDetail,
@@ -86,9 +87,9 @@ export function getTextContent(result: ToolResult): string {
     return textContent.text;
 }
 
-export function parseIssueResult(result: ToolResult): RedmineIssue {
+export function parseIssueResult(result: ToolResult): GetIssueResult {
     const text = getTextContent(result);
-    return JSON.parse(text) as RedmineIssue;
+    return JSON.parse(text) as GetIssueResult;
 }
 
 export function parseMembershipsResult(result: ToolResult): {
@@ -104,12 +105,14 @@ export function parseMembershipsResult(result: ToolResult): {
 
 export function parseUpdateResult(result: ToolResult): {
     issue: RedmineIssue;
+    journalPagination?: GetIssueResult["journalPagination"];
     time_entry?: RedmineTimeEntry;
     time_entry_error?: string;
 } {
     const text = getTextContent(result);
     return JSON.parse(text) as {
         issue: RedmineIssue;
+        journalPagination?: GetIssueResult["journalPagination"];
         time_entry?: RedmineTimeEntry;
         time_entry_error?: string;
     };
