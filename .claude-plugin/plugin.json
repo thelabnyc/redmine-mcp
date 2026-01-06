@@ -1,0 +1,12 @@
+{
+    "name": "redmine-mcp",
+    "version": "0.2.0",
+    "description": "Redmine integration - fetch and update issues",
+    "author": {
+        "name": "thelab",
+        "organization": "thelabnyc"
+    },
+    "repository": "https://gitlab.com/thelabnyc/redmine-mcp",
+    "license": "ISC",
+    "keywords": ["redmine", "mcp", "project-management", "issues"]
+}
