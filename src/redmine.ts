@@ -90,6 +90,12 @@ export interface RedmineRelation {
     delay?: number;
 }
 
+/** Data from Redmine Agile plugin. Only present if plugin is installed. */
+export interface RedmineAgileData {
+    story_points?: number | null;
+    position?: number | null;
+}
+
 export interface RedmineIssue {
     id: number;
     project: RedmineProject;
@@ -111,6 +117,7 @@ export interface RedmineIssue {
     watchers?: RedmineWatcher[];
     relations?: RedmineRelation[];
     children?: RedmineIssue[];
+    agile_data_attributes?: RedmineAgileData;
 }
 
 export interface GetIssueOptions {
@@ -217,6 +224,64 @@ interface RedmineIssueStatusesResponse {
 
 interface RedmineCurrentUserResponse {
     user: RedmineCurrentUser & { api_key?: string };
+}
+
+interface RedmineIssuesListResponse {
+    issues: RedmineIssue[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
+interface RedmineProjectFull {
+    id: number;
+    name: string;
+    identifier: string;
+    description?: string;
+    status: number;
+    is_public: boolean;
+    created_on: string;
+    updated_on: string;
+}
+
+interface RedmineProjectsListResponse {
+    projects: RedmineProjectFull[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
+export interface ListMyIssuesOptions {
+    statusId?: number | "open" | "closed" | "*";
+    projectId?: string | number;
+    limit?: number;
+    offset?: number;
+    sort?: string;
+}
+
+export interface RedmineIssueSummary {
+    id: number;
+    project: RedmineProject;
+    tracker: RedmineTracker;
+    status: RedmineStatus;
+    priority: RedminePriority;
+    subject: string;
+    due_date?: string;
+    done_ratio: number;
+    updated_on: string;
+    /** Board position from Redmine Agile plugin. Undefined if plugin not installed. */
+    position?: number | null;
+}
+
+export interface RedmineProjectSummary {
+    id: number;
+    identifier: string;
+    name: string;
+}
+
+export interface ListProjectsOptions {
+    limit?: number;
+    offset?: number;
 }
 
 export class RedmineClient {
@@ -463,5 +528,123 @@ export class RedmineClient {
         // Exclude api_key from response - agent doesn't need it
         const { api_key: _, ...user } = data.user;
         return user;
+    }
+
+    async listMyIssues(options: ListMyIssuesOptions = {}): Promise<{
+        issues: RedmineIssueSummary[];
+        total_count: number;
+        offset: number;
+        limit: number;
+    }> {
+        const DEFAULT_SORT = "priority:desc,updated_on:desc";
+
+        const params = new URLSearchParams();
+        params.set("assigned_to_id", "me");
+
+        if (options.statusId !== undefined) {
+            params.set("status_id", String(options.statusId));
+        }
+        if (options.projectId !== undefined) {
+            params.set("project_id", String(options.projectId));
+        }
+        if (options.limit !== undefined) {
+            params.set("limit", String(options.limit));
+        }
+        if (options.offset !== undefined) {
+            params.set("offset", String(options.offset));
+        }
+        params.set("sort", options.sort ?? DEFAULT_SORT);
+
+        const url = `${this.config.redmineUrl}/issues.json?${params.toString()}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch issues: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineIssuesListResponse;
+
+        // Return slim summaries to reduce response size
+        const summaries: RedmineIssueSummary[] = data.issues.map((issue) => ({
+            id: issue.id,
+            project: issue.project,
+            tracker: issue.tracker,
+            status: issue.status,
+            priority: issue.priority,
+            subject: issue.subject,
+            due_date: issue.due_date,
+            done_ratio: issue.done_ratio,
+            updated_on: issue.updated_on,
+            position: issue.agile_data_attributes?.position,
+        }));
+
+        return {
+            issues: summaries,
+            total_count: data.total_count,
+            offset: data.offset,
+            limit: data.limit,
+        };
+    }
+
+    async listProjects(options: ListProjectsOptions = {}): Promise<{
+        projects: RedmineProjectSummary[];
+        total_count: number;
+        offset: number;
+        limit: number;
+    }> {
+        const params = new URLSearchParams();
+
+        if (options.limit !== undefined) {
+            params.set("limit", String(options.limit));
+        }
+        if (options.offset !== undefined) {
+            params.set("offset", String(options.offset));
+        }
+
+        const queryString = params.toString();
+        const url = `${this.config.redmineUrl}/projects.json${queryString ? `?${queryString}` : ""}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch projects: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineProjectsListResponse;
+
+        // Return slim summaries
+        const summaries: RedmineProjectSummary[] = data.projects.map(
+            (project) => ({
+                id: project.id,
+                identifier: project.identifier,
+                name: project.name,
+            }),
+        );
+
+        return {
+            projects: summaries,
+            total_count: data.total_count,
+            offset: data.offset,
+            limit: data.limit,
+        };
     }
 }

@@ -7,7 +7,9 @@ import type {
     RedmineCurrentUser,
     RedmineIssue,
     RedmineIssueStatusDetail,
+    RedmineIssueSummary,
     RedmineMembership,
+    RedmineProjectSummary,
     RedmineTimeEntry,
 } from "./redmine.js";
 import { createServer } from "./server.js";
@@ -128,6 +130,36 @@ export function parseIssueStatusesResult(
 export function parseCurrentUserResult(result: ToolResult): RedmineCurrentUser {
     const text = getTextContent(result);
     return JSON.parse(text) as RedmineCurrentUser;
+}
+
+export function parseMyIssuesResult(result: ToolResult): {
+    issues: RedmineIssueSummary[];
+    total_count: number;
+    offset: number;
+    limit: number;
+} {
+    const text = getTextContent(result);
+    return JSON.parse(text) as {
+        issues: RedmineIssueSummary[];
+        total_count: number;
+        offset: number;
+        limit: number;
+    };
+}
+
+export function parseProjectsResult(result: ToolResult): {
+    projects: RedmineProjectSummary[];
+    total_count: number;
+    offset: number;
+    limit: number;
+} {
+    const text = getTextContent(result);
+    return JSON.parse(text) as {
+        projects: RedmineProjectSummary[];
+        total_count: number;
+        offset: number;
+        limit: number;
+    };
 }
 
 /**
