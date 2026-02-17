@@ -1,3 +1,9 @@
+## v0.4.0 (2026-02-17)
+
+### Feat
+
+- add custom fields support to issue create/update
+
 ## v0.3.0 (2026-01-16)
 
 ### Feat
