@@ -52,6 +52,20 @@ export interface RedmineIssueStatusDetail {
     is_closed: boolean;
 }
 
+export interface RedmineTrackerDetail {
+    id: number;
+    name: string;
+    default_status: { id: number; name: string };
+    description?: string;
+    enabled_standard_fields?: string[];
+}
+
+export interface RedminePriorityDetail {
+    id: number;
+    name: string;
+    is_default: boolean;
+}
+
 export interface RedmineJournalDetail {
     property: string;
     name: string;
@@ -96,6 +110,11 @@ export interface RedmineAgileData {
     position?: number | null;
 }
 
+export interface RedmineCustomFieldDefinition {
+    id: number;
+    name: string;
+}
+
 export interface RedmineIssue {
     id: number;
     project: RedmineProject;
@@ -112,6 +131,7 @@ export interface RedmineIssue {
     estimated_hours?: number;
     created_on: string;
     updated_on: string;
+    custom_fields?: RedmineCustomField[];
     journals?: RedmineJournal[];
     attachments?: RedmineAttachment[];
     watchers?: RedmineWatcher[];
@@ -154,6 +174,25 @@ export interface UpdateIssueData {
     estimated_hours?: number;
     notes?: string;
     private_notes?: boolean;
+    custom_fields?: Array<{ id: number; value: string | string[] }>;
+}
+
+// Create Issue types
+export interface CreateIssueData {
+    project_id: string | number;
+    subject: string;
+    description?: string;
+    status_id?: number;
+    priority_id?: number;
+    assigned_to_id?: number;
+    tracker_id?: number;
+    parent_issue_id?: number;
+    start_date?: string;
+    due_date?: string;
+    done_ratio?: number;
+    estimated_hours?: number;
+    is_private?: boolean;
+    custom_fields?: Array<{ id: number; value: string | string[] }>;
 }
 
 // Time Entry types
@@ -220,6 +259,27 @@ interface RedmineMembershipsResponse {
 
 interface RedmineIssueStatusesResponse {
     issue_statuses: RedmineIssueStatusDetail[];
+}
+
+interface RedmineTrackersResponse {
+    trackers: RedmineTrackerDetail[];
+}
+
+interface RedminePrioritiesResponse {
+    issue_priorities: RedminePriorityDetail[];
+}
+
+interface RedmineCreateIssueResponse {
+    issue: { id: number };
+}
+
+interface RedmineProjectDetailResponse {
+    project: {
+        id: number;
+        name: string;
+        identifier: string;
+        issue_custom_fields?: RedmineCustomFieldDefinition[];
+    };
 }
 
 interface RedmineCurrentUserResponse {
@@ -504,6 +564,98 @@ export class RedmineClient {
 
         const data = (await response.json()) as RedmineIssueStatusesResponse;
         return data.issue_statuses;
+    }
+
+    async listTrackers(): Promise<RedmineTrackerDetail[]> {
+        const url = `${this.config.redmineUrl}/trackers.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch trackers: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineTrackersResponse;
+        return data.trackers;
+    }
+
+    async listIssuePriorities(): Promise<RedminePriorityDetail[]> {
+        const url = `${this.config.redmineUrl}/enumerations/issue_priorities.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch issue priorities: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedminePrioritiesResponse;
+        return data.issue_priorities;
+    }
+
+    async getProjectCustomFields(
+        projectId: string | number,
+    ): Promise<RedmineCustomFieldDefinition[]> {
+        const url = `${this.config.redmineUrl}/projects/${projectId}.json?include=issue_custom_fields`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch project custom fields: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineProjectDetailResponse;
+        return data.project.issue_custom_fields ?? [];
+    }
+
+    async createIssue(data: CreateIssueData): Promise<GetIssueResult> {
+        const url = `${this.config.redmineUrl}/issues.json`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ issue: data }),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to create issue: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const result = (await response.json()) as RedmineCreateIssueResponse;
+        return this.getIssue(result.issue.id);
     }
 
     async getCurrentUser(): Promise<RedmineCurrentUser> {

@@ -416,6 +416,49 @@ describe("update-issue tool", () => {
         }
     });
 
+    it("updates issue with custom fields", async () => {
+        mockFetch
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve({}),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve(sampleUpdatedIssueResponse),
+            });
+
+        const { client, cleanup } = await createTestClientServer();
+
+        try {
+            await client.callTool({
+                name: "update-issue",
+                arguments: {
+                    issueId: "12345",
+                    customFields: [
+                        { id: 1, value: "Sprint 5" },
+                        { id: 2, value: ["val1", "val2"] },
+                    ],
+                },
+            });
+
+            const [, putOptions] = mockFetch.mock.calls[0] as [
+                string,
+                RequestInit,
+            ];
+            const body = JSON.parse(
+                putOptions.body as string,
+            ) as IssueRequestBody;
+            expect(body.issue.custom_fields).toEqual([
+                { id: 1, value: "Sprint 5" },
+                { id: 2, value: ["val1", "val2"] },
+            ]);
+        } finally {
+            await cleanup();
+        }
+    });
+
     it("handles issue ID with # prefix", async () => {
         mockFetch
             .mockResolvedValueOnce({

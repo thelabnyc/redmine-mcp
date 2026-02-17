@@ -91,6 +91,21 @@ export function registerUpdateIssueTool(
                     .describe(
                         "Date for time entry (YYYY-MM-DD, defaults to today)",
                     ),
+                customFields: z
+                    .array(
+                        z.object({
+                            id: z.number().describe("Custom field ID"),
+                            value: z
+                                .union([z.string(), z.array(z.string())])
+                                .describe(
+                                    "Field value (string, or array for multi-value fields)",
+                                ),
+                        }),
+                    )
+                    .optional()
+                    .describe(
+                        "Custom field values. Use list-project-custom-fields to discover available fields.",
+                    ),
             },
         },
         async ({
@@ -112,6 +127,7 @@ export function registerUpdateIssueTool(
             logActivityId,
             logComments,
             logSpentOn,
+            customFields,
         }) => {
             try {
                 const parsed = parseIssueId(issueId);
@@ -149,6 +165,8 @@ export function registerUpdateIssueTool(
                 if (notes !== undefined) updateData.notes = notes;
                 if (privateNotes !== undefined)
                     updateData.private_notes = privateNotes;
+                if (customFields !== undefined)
+                    updateData.custom_fields = customFields;
 
                 // Update the issue
                 const updatedIssue = await redmineClient.updateIssue(
