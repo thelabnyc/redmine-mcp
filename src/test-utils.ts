@@ -5,12 +5,15 @@ import { vi } from "vitest";
 import type {
     GetIssueResult,
     RedmineCurrentUser,
+    RedmineCustomFieldDefinition,
     RedmineIssue,
     RedmineIssueStatusDetail,
     RedmineIssueSummary,
     RedmineMembership,
+    RedminePriorityDetail,
     RedmineProjectSummary,
     RedmineTimeEntry,
+    RedmineTrackerDetail,
 } from "./redmine.js";
 import { createServer } from "./server.js";
 
@@ -45,6 +48,26 @@ export interface IssueRequestBody {
         estimated_hours?: number;
         notes?: string;
         private_notes?: boolean;
+        custom_fields?: Array<{ id: number; value: string | string[] }>;
+    };
+}
+
+export interface CreateIssueRequestBody {
+    issue: {
+        project_id: string | number;
+        subject: string;
+        description?: string;
+        status_id?: number;
+        priority_id?: number;
+        assigned_to_id?: number;
+        tracker_id?: number;
+        parent_issue_id?: number;
+        start_date?: string;
+        due_date?: string;
+        done_ratio?: number;
+        estimated_hours?: number;
+        is_private?: boolean;
+        custom_fields?: Array<{ id: number; value: string | string[] }>;
     };
 }
 
@@ -160,6 +183,32 @@ export function parseProjectsResult(result: ToolResult): {
         offset: number;
         limit: number;
     };
+}
+
+export function parseCreateResult(result: ToolResult): GetIssueResult {
+    const text = getTextContent(result);
+    return JSON.parse(text) as GetIssueResult;
+}
+
+export function parseTrackersResult(
+    result: ToolResult,
+): RedmineTrackerDetail[] {
+    const text = getTextContent(result);
+    return JSON.parse(text) as RedmineTrackerDetail[];
+}
+
+export function parsePrioritiesResult(
+    result: ToolResult,
+): RedminePriorityDetail[] {
+    const text = getTextContent(result);
+    return JSON.parse(text) as RedminePriorityDetail[];
+}
+
+export function parseCustomFieldsResult(
+    result: ToolResult,
+): RedmineCustomFieldDefinition[] {
+    const text = getTextContent(result);
+    return JSON.parse(text) as RedmineCustomFieldDefinition[];
 }
 
 /**

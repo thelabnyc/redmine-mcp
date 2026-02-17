@@ -4,12 +4,15 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 
 ## Features
 
-- Fetch issue details by ID, including subject, description, status, priority, and assignee
-- Update issues: change status, assign users, add notes, and more
-- Log time spent on issues with integrated time tracking
-- List project members to find user IDs for assignments
-- List available issue statuses to find valid status IDs
-- Retrieve change history (journals) with every request
+- **Create issues** with full field support including custom fields
+- **Fetch issue details** by ID, including subject, description, status, priority, and assignee
+- **Update issues**: change status, assign users, add notes, set custom fields, and more
+- **Log time** spent on issues with integrated time tracking
+- **List issues** assigned to the current user, with filtering and sorting
+- **List projects** accessible to the current user
+- **List project members** to find user IDs for assignments
+- **Discover metadata**: list available statuses, trackers, priorities, and custom fields
+- **Retrieve change history** (journals) with every request
 - Optionally include attachments, watchers, relations, and child issues
 
 ## Installation
@@ -126,9 +129,32 @@ Fetch details about a Redmine issue by ID.
 
 > "Look up Redmine issue #12345 and summarize the recent activity"
 
-Or:
+### create-issue
 
-> "What's the status of issue 6789? Include any attachments."
+Create a new Redmine issue.
+
+**Parameters:**
+
+| Parameter        | Type          | Required | Description                                               |
+| ---------------- | ------------- | -------- | --------------------------------------------------------- |
+| `projectId`      | string/number | Yes      | Project identifier (string slug or numeric ID)            |
+| `subject`        | string        | Yes      | Issue subject/title                                       |
+| `description`    | string        | No       | Issue description                                         |
+| `statusId`       | number        | No       | Status ID to set                                          |
+| `priorityId`     | number        | No       | Priority ID to set                                        |
+| `assignedToId`   | number        | No       | User ID to assign                                         |
+| `trackerId`      | number        | No       | Tracker ID to set                                         |
+| `parentIssueId`  | number        | No       | Parent issue ID                                           |
+| `startDate`      | string        | No       | Start date (YYYY-MM-DD format)                            |
+| `dueDate`        | string        | No       | Due date (YYYY-MM-DD format)                              |
+| `doneRatio`      | number        | No       | Percent done (0-100)                                      |
+| `estimatedHours` | number        | No       | Estimated hours for the issue                             |
+| `isPrivate`      | boolean       | No       | Whether the issue is private                              |
+| `customFields`   | array         | No       | Custom field values (see [Custom Fields](#custom-fields)) |
+
+**Example usage in Claude:**
+
+> "Create a bug in project 'my-app' titled 'Login page crashes on submit'"
 
 ### update-issue
 
@@ -136,38 +162,66 @@ Update a Redmine issue. Can change fields, add notes, and log time spent.
 
 **Parameters:**
 
-| Parameter        | Type    | Required | Description                                          |
-| ---------------- | ------- | -------- | ---------------------------------------------------- |
-| `issueId`        | string  | Yes      | Issue ID (e.g., `#12345` or `12345`)                 |
-| `subject`        | string  | No       | New issue subject/title                              |
-| `description`    | string  | No       | New issue description                                |
-| `statusId`       | number  | No       | Status ID to set                                     |
-| `priorityId`     | number  | No       | Priority ID to set                                   |
-| `assignedToId`   | number  | No       | User ID to assign (use 0 to unassign)                |
-| `trackerId`      | number  | No       | Tracker ID to set                                    |
-| `parentIssueId`  | number  | No       | Parent issue ID                                      |
-| `startDate`      | string  | No       | Start date (YYYY-MM-DD format)                       |
-| `dueDate`        | string  | No       | Due date (YYYY-MM-DD format)                         |
-| `doneRatio`      | number  | No       | Percent done (0-100)                                 |
-| `estimatedHours` | number  | No       | Estimated hours for the issue                        |
-| `notes`          | string  | No       | Comment/note to add to the issue journal             |
-| `privateNotes`   | boolean | No       | Make the notes private                               |
-| `logHours`       | number  | No       | Hours to log as a time entry                         |
-| `logActivityId`  | number  | No       | Activity ID for time entry (uses default if omitted) |
-| `logComments`    | string  | No       | Comments for the time entry                          |
-| `logSpentOn`     | string  | No       | Date for time entry (YYYY-MM-DD, defaults to today)  |
+| Parameter        | Type    | Required | Description                                               |
+| ---------------- | ------- | -------- | --------------------------------------------------------- |
+| `issueId`        | string  | Yes      | Issue ID (e.g., `#12345` or `12345`)                      |
+| `subject`        | string  | No       | New issue subject/title                                   |
+| `description`    | string  | No       | New issue description                                     |
+| `statusId`       | number  | No       | Status ID to set                                          |
+| `priorityId`     | number  | No       | Priority ID to set                                        |
+| `assignedToId`   | number  | No       | User ID to assign (use 0 to unassign)                     |
+| `trackerId`      | number  | No       | Tracker ID to set                                         |
+| `parentIssueId`  | number  | No       | Parent issue ID                                           |
+| `startDate`      | string  | No       | Start date (YYYY-MM-DD format)                            |
+| `dueDate`        | string  | No       | Due date (YYYY-MM-DD format)                              |
+| `doneRatio`      | number  | No       | Percent done (0-100)                                      |
+| `estimatedHours` | number  | No       | Estimated hours for the issue                             |
+| `notes`          | string  | No       | Comment/note to add to the issue journal                  |
+| `privateNotes`   | boolean | No       | Make the notes private                                    |
+| `logHours`       | number  | No       | Hours to log as a time entry                              |
+| `logActivityId`  | number  | No       | Activity ID for time entry (uses default if omitted)      |
+| `logComments`    | string  | No       | Comments for the time entry                               |
+| `logSpentOn`     | string  | No       | Date for time entry (YYYY-MM-DD, defaults to today)       |
+| `customFields`   | array   | No       | Custom field values (see [Custom Fields](#custom-fields)) |
 
 **Example usage in Claude:**
 
 > "Update issue #12345 to status 2 and assign to user 5"
-
-Or:
-
+>
 > "Add a note to issue #6789 saying 'Fixed the bug' and log 1.5 hours"
 
-Or:
+### list-my-issues
 
-> "Mark issue #12345 as 75% done and log 2 hours of development time"
+List issues assigned to the current user, with optional filtering and sorting.
+
+**Parameters:**
+
+| Parameter   | Type          | Required | Description                                           |
+| ----------- | ------------- | -------- | ----------------------------------------------------- |
+| `statusId`  | number/string | No       | Filter by status ID, or `"open"`, `"closed"`, `"*"`   |
+| `projectId` | string/number | No       | Filter by project                                     |
+| `limit`     | number        | No       | Maximum results to return                             |
+| `offset`    | number        | No       | Number of results to skip for pagination              |
+| `sort`      | string        | No       | Sort order (default: `priority:desc,updated_on:desc`) |
+
+**Example usage in Claude:**
+
+> "What issues are assigned to me?"
+
+### list-projects
+
+List all projects accessible to the current user.
+
+**Parameters:**
+
+| Parameter | Type   | Required | Description                              |
+| --------- | ------ | -------- | ---------------------------------------- |
+| `limit`   | number | No       | Maximum results to return                |
+| `offset`  | number | No       | Number of results to skip for pagination |
+
+**Example usage in Claude:**
+
+> "What Redmine projects do I have access to?"
 
 ### list-project-members
 
@@ -183,11 +237,7 @@ List all members of a Redmine project. Use this to find user IDs for assigning i
 
 **Example usage in Claude:**
 
-> "List all members of the 'my-project' project"
-
-Or:
-
-> "Who can I assign issues to in project #1?"
+> "Who can I assign issues to in project 'my-project'?"
 
 ### list-issue-statuses
 
@@ -199,9 +249,62 @@ List all available issue statuses. Use this to find valid status IDs when updati
 
 > "What statuses can I set for issues?"
 
-Or:
+### list-trackers
 
-> "List the available issue statuses so I can update issue #123"
+List all available trackers (e.g., Bug, Feature, Support). Use this to find valid tracker IDs.
+
+**Parameters:** None
+
+**Example usage in Claude:**
+
+> "What trackers are available?"
+
+### list-issue-priorities
+
+List all available issue priorities. Use this to find valid priority IDs.
+
+**Parameters:** None
+
+**Example usage in Claude:**
+
+> "What priority levels can I set?"
+
+### list-project-custom-fields
+
+List the custom fields available for issues in a given project. Use this to discover custom field IDs before setting them on `create-issue` or `update-issue`.
+
+**Parameters:**
+
+| Parameter   | Type          | Required | Description                                    |
+| ----------- | ------------- | -------- | ---------------------------------------------- |
+| `projectId` | string/number | Yes      | Project identifier (string slug or numeric ID) |
+
+**Example usage in Claude:**
+
+> "What custom fields are available for project 'my-app'?"
+
+### whoami
+
+Get information about the currently authenticated Redmine user.
+
+**Parameters:** None
+
+**Example usage in Claude:**
+
+> "Who am I logged in as in Redmine?"
+
+### Custom Fields
+
+The `customFields` parameter on `create-issue` and `update-issue` accepts an array of objects:
+
+```json
+[
+    { "id": 1, "value": "Sprint 5" },
+    { "id": 2, "value": ["option1", "option2"] }
+]
+```
+
+Use `list-project-custom-fields` to discover available custom field IDs for a project. Multi-value fields accept an array of strings.
 
 ## Development
 
