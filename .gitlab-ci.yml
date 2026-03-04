@@ -15,12 +15,10 @@ variables:
   NPM_CONFIG_PROVENANCE: "false"
 
 include:
-  - component: gitlab.com/thelabnyc/thelab-ci-components/review@0.7.1
-  - component: gitlab.com/thelabnyc/thelab-ci-components/precommit@0.7.1
-    inputs:
-      image: registry.gitlab.com/thelabnyc/python:3.14-node24@sha256:07aabf039124abeda3df8cf86212d8df58d3f0481149f2ff084481b0e2660ec2
-  - component: gitlab.com/thelabnyc/thelab-ci-components/publish-gitlab-release@0.7.1
-  - component: gitlab.com/thelabnyc/thelab-ci-components/publish-to-npm@0.7.1
+  - component: gitlab.com/thelabnyc/thelab-ci-components/review@0.8.3
+  - component: gitlab.com/thelabnyc/thelab-ci-components/precommit@0.8.3
+  - component: gitlab.com/thelabnyc/thelab-ci-components/publish-gitlab-release@0.8.3
+  - component: gitlab.com/thelabnyc/thelab-ci-components/publish-to-npm@0.8.3
 
 test:
   stage: test
