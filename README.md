@@ -71,7 +71,7 @@ Create or edit `.claude/settings.json` in your project:
 
 ### User-level configuration
 
-Add to `~/.claude/settings.json` to make available across all projects:
+Add to `~/.claude.json` to make available across all projects:
 
 ```json
 {
