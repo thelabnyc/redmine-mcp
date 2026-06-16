@@ -302,14 +302,22 @@ export interface CreateIssueRelationData {
     delay?: number;
 }
 
-// Time Entry types
-export interface CreateTimeEntryData {
-    issue_id: number;
+export interface TimeEntryMutationFields {
     hours: number;
     activity_id?: number;
     spent_on?: string; // YYYY-MM-DD
     comments?: string;
+    custom_fields?: Array<{ id: number; value: string | string[] }>;
 }
+
+// Time Entry types
+export type CreateTimeEntryData = TimeEntryMutationFields &
+    (
+        | { issue_id: number; project_id?: never }
+        | { project_id: number; issue_id?: never }
+    );
+
+export type UpdateTimeEntryData = Partial<TimeEntryMutationFields>;
 
 export interface RedmineAttachmentDetailResponse {
     attachment: RedmineAttachment;
@@ -348,6 +356,7 @@ export interface RedmineTimeEntry {
     spent_on: string;
     created_on: string;
     updated_on: string;
+    custom_fields?: RedmineCustomField[];
 }
 
 export interface RedmineActivity {
@@ -395,6 +404,13 @@ interface RedmineRelationResponse {
 
 interface RedmineTimeEntryResponse {
     time_entry: RedmineTimeEntry;
+}
+
+interface RedmineTimeEntriesListResponse {
+    time_entries: RedmineTimeEntry[];
+    total_count: number;
+    offset: number;
+    limit: number;
 }
 
 interface RedmineActivitiesResponse {
@@ -511,6 +527,25 @@ export interface ListIssuesOptions {
 
 export interface ListIssuesResult {
     issues: RedmineIssue[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
+export interface ListTimeEntriesOptions {
+    issueId?: string | number;
+    projectId?: string | number;
+    userId?: number | "me";
+    spentOn?: string;
+    from?: string;
+    to?: string;
+    activityId?: number;
+    limit?: number;
+    offset?: number;
+}
+
+export interface ListTimeEntriesResult {
+    time_entries: RedmineTimeEntry[];
     total_count: number;
     offset: number;
     limit: number;
@@ -987,6 +1022,133 @@ export class RedmineClient {
 
         const result = (await response.json()) as RedmineTimeEntryResponse;
         return result.time_entry;
+    }
+
+    async listTimeEntries(
+        options: ListTimeEntriesOptions = {},
+    ): Promise<ListTimeEntriesResult> {
+        const params = new URLSearchParams();
+
+        if (options.issueId !== undefined) {
+            params.set("issue_id", String(options.issueId).replace(/^#/, ""));
+        }
+        if (options.projectId !== undefined) {
+            params.set("project_id", String(options.projectId));
+        }
+        if (options.userId !== undefined) {
+            params.set("user_id", String(options.userId));
+        }
+        if (options.spentOn !== undefined) {
+            params.set("spent_on", options.spentOn);
+        }
+        if (options.from !== undefined) {
+            params.set("from", options.from);
+        }
+        if (options.to !== undefined) {
+            params.set("to", options.to);
+        }
+        if (options.activityId !== undefined) {
+            params.set("activity_id", String(options.activityId));
+        }
+        if (options.limit !== undefined) {
+            params.set("limit", String(options.limit));
+        }
+        if (options.offset !== undefined) {
+            params.set("offset", String(options.offset));
+        }
+
+        const queryString = params.toString();
+        const url = `${this.config.redmineUrl}/time_entries.json${queryString ? `?${queryString}` : ""}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch time entries: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineTimeEntriesListResponse;
+        return {
+            time_entries: data.time_entries,
+            total_count: data.total_count,
+            offset: data.offset,
+            limit: data.limit,
+        };
+    }
+
+    async getTimeEntry(timeEntryId: number): Promise<RedmineTimeEntry> {
+        const url = `${this.config.redmineUrl}/time_entries/${timeEntryId}.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch time entry ${timeEntryId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineTimeEntryResponse;
+        return data.time_entry;
+    }
+
+    async updateTimeEntry(
+        timeEntryId: number,
+        data: UpdateTimeEntryData,
+    ): Promise<RedmineTimeEntry> {
+        const url = `${this.config.redmineUrl}/time_entries/${timeEntryId}.json`;
+
+        const response = await fetch(url, {
+            method: "PUT",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ time_entry: data }),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to update time entry ${timeEntryId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        return this.getTimeEntry(timeEntryId);
+    }
+
+    async deleteTimeEntry(timeEntryId: number): Promise<void> {
+        const url = `${this.config.redmineUrl}/time_entries/${timeEntryId}.json`;
+
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to delete time entry ${timeEntryId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
     }
 
     async getTimeEntryActivities(): Promise<RedmineActivity[]> {

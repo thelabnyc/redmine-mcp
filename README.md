@@ -340,6 +340,105 @@ Update a Redmine issue. Can change fields, add notes, and log time spent.
 >
 > "Add a note to issue #6789 saying 'Fixed the bug' and log 1.5 hours"
 
+### list-time-entries
+
+List Redmine time entries with optional filters and pagination.
+
+**Parameters:**
+
+| Parameter    | Type          | Required | Description                        |
+| ------------ | ------------- | -------- | ---------------------------------- |
+| `issueId`    | string/number | No       | Filter by issue ID                 |
+| `projectId`  | string/number | No       | Filter by project ID or identifier |
+| `userId`     | number/string | No       | Filter by user ID, or `"me"`       |
+| `spentOn`    | string        | No       | Exact spent date (YYYY-MM-DD)      |
+| `from`       | string        | No       | Start date (YYYY-MM-DD)            |
+| `to`         | string        | No       | End date (YYYY-MM-DD)              |
+| `activityId` | number        | No       | Filter by time entry activity ID   |
+| `limit`      | number        | No       | Maximum results to return          |
+| `offset`     | number        | No       | Number of results to skip          |
+
+**Example usage in Claude:**
+
+> "List my time entries for project 'my-app' from 2026-06-01 to 2026-06-30"
+
+### get-time-entry
+
+Fetch one Redmine time entry by ID.
+
+**Parameters:**
+
+| Parameter     | Type   | Required | Description   |
+| ------------- | ------ | -------- | ------------- |
+| `timeEntryId` | number | Yes      | Time entry ID |
+
+**Example usage in Claude:**
+
+> "Show me time entry 100"
+
+### create-time-entry
+
+Create a Redmine time entry for exactly one issue or numeric project ID. Callers must summarize the target issue or project, hours, activity, spent date, comments, and custom fields in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter      | Type          | Required | Description                                                   |
+| -------------- | ------------- | -------- | ------------------------------------------------------------- |
+| `issueId`      | string/number | No       | Issue ID; exactly one of `issueId` or `projectId` is required |
+| `projectId`    | string/number | No       | Numeric project ID; exactly one target is required            |
+| `hours`        | number        | Yes      | Hours to log                                                  |
+| `activityId`   | number        | No       | Time entry activity ID                                        |
+| `spentOn`      | string        | No       | Spent date (YYYY-MM-DD)                                       |
+| `comments`     | string        | No       | Time entry comments                                           |
+| `customFields` | array         | No       | Custom field values                                           |
+
+**Example usage in Claude:**
+
+> "Log 2.5 hours on issue #12345 for development today"
+
+### update-time-entry
+
+Update a Redmine time entry. Redmine returns an empty response to the update request, so this tool fetches and returns the refreshed time entry after the update. Callers must summarize the time entry ID and all planned changes in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter      | Type   | Required | Description             |
+| -------------- | ------ | -------- | ----------------------- |
+| `timeEntryId`  | number | Yes      | Time entry ID           |
+| `hours`        | number | No       | Hours to set            |
+| `activityId`   | number | No       | Time entry activity ID  |
+| `spentOn`      | string | No       | Spent date (YYYY-MM-DD) |
+| `comments`     | string | No       | Time entry comments     |
+| `customFields` | array  | No       | Custom field values     |
+
+**Example usage in Claude:**
+
+> "Update time entry 100 to 3 hours"
+
+### delete-time-entry
+
+Delete a Redmine time entry by ID. Callers must summarize the time entry ID and delete action in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter     | Type   | Required | Description   |
+| ------------- | ------ | -------- | ------------- |
+| `timeEntryId` | number | Yes      | Time entry ID |
+
+**Example usage in Claude:**
+
+> "Delete time entry 100"
+
+### list-time-entry-activities
+
+List Redmine time entry activities. Use this to discover activity IDs before creating or updating time entries.
+
+**Parameters:** None.
+
+**Example usage in Claude:**
+
+> "List available time entry activities"
+
 ### list-my-issues
 
 List issues assigned to the current user, with optional filtering and sorting.
