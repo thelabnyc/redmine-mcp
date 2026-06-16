@@ -44,8 +44,8 @@ function isPrivateOrLocalHostname(hostname: string): boolean {
 
         return (
             normalizedHostname === "::1" ||
-            ((firstSegment & 0xffc0) === 0xfe80 ||
-                (firstSegment & 0xfe00) === 0xfc00)
+            (firstSegment & 0xffc0) === 0xfe80 ||
+            (firstSegment & 0xfe00) === 0xfc00
         );
     }
 
@@ -651,7 +651,10 @@ export class RedmineClient {
         downloadUrl: URL,
         redmineOrigin: string,
     ): void {
-        if (downloadUrl.protocol !== "http:" && downloadUrl.protocol !== "https:") {
+        if (
+            downloadUrl.protocol !== "http:" &&
+            downloadUrl.protocol !== "https:"
+        ) {
             throw new Error(
                 `Failed to download attachment ${attachmentId}: unsupported attachment URL protocol ${downloadUrl.protocol}`,
             );

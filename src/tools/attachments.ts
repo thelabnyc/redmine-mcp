@@ -71,7 +71,9 @@ async function rejectSymlinkDestination(
     try {
         const destinationStat = await lstat(safeDestinationPath);
         if (destinationStat.isSymbolicLink()) {
-            throw new Error(`Destination is a symbolic link: ${destinationPath}`);
+            throw new Error(
+                `Destination is a symbolic link: ${destinationPath}`,
+            );
         }
     } catch (error) {
         if (
@@ -99,7 +101,9 @@ async function prepareDownloadDestinationPath(
     const realRoot = await realpath(config.fileRoot);
     const realDestinationDir = await realpath(destinationDir);
     if (!isPathWithinRoot(realRoot, realDestinationDir)) {
-        throw new Error(`Path is outside configured file root: ${destinationPath}`);
+        throw new Error(
+            `Path is outside configured file root: ${destinationPath}`,
+        );
     }
 
     const safeDestinationPath = path.join(
@@ -312,12 +316,13 @@ export function registerAttachmentTools(
                         attachmentId,
                         attachment.content_url,
                     );
-                const safeDestinationPath = await prepareDownloadDestinationPath(
-                    resolvedDestinationPath,
-                    destinationPath,
-                    config,
-                    overwrite,
-                );
+                const safeDestinationPath =
+                    await prepareDownloadDestinationPath(
+                        resolvedDestinationPath,
+                        destinationPath,
+                        config,
+                        overwrite,
+                    );
                 try {
                     await writeFile(
                         safeDestinationPath,

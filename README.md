@@ -39,12 +39,12 @@ npm run build
 
 The server requires two environment variables:
 
-| Variable                       | Description                                                           | Example                     |
-| ------------------------------ | --------------------------------------------------------------------- | --------------------------- |
-| `REDMINE_URL`                  | Base URL of your Redmine instance                                     | `https://mycompany.plan.io` |
-| `REDMINE_API_KEY`              | Your Redmine API key                                                  | `abc123def456...`           |
-| `REDMINE_MCP_FILE_ROOT`        | Directory that attachment upload/download paths must stay within      | `/Users/me/redmine-files`   |
-| `REDMINE_MCP_MAX_UPLOAD_BYTES` | Maximum local file size allowed for `attach-file-to-issue` in bytes   | `104857600`                 |
+| Variable                       | Description                                                         | Example                     |
+| ------------------------------ | ------------------------------------------------------------------- | --------------------------- |
+| `REDMINE_URL`                  | Base URL of your Redmine instance                                   | `https://mycompany.plan.io` |
+| `REDMINE_API_KEY`              | Your Redmine API key                                                | `abc123def456...`           |
+| `REDMINE_MCP_FILE_ROOT`        | Directory that attachment upload/download paths must stay within    | `/Users/me/redmine-files`   |
+| `REDMINE_MCP_MAX_UPLOAD_BYTES` | Maximum local file size allowed for `attach-file-to-issue` in bytes | `104857600`                 |
 
 ### Getting your Redmine API Key
 

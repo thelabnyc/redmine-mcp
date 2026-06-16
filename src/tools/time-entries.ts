@@ -252,9 +252,8 @@ export function registerTimeEntryTools(
                     );
                 }
 
-                const timeEntry = await redmineClient.createTimeEntry(
-                    createData,
-                );
+                const timeEntry =
+                    await redmineClient.createTimeEntry(createData);
                 return toolJson(timeEntry);
             } catch (error) {
                 const message =
