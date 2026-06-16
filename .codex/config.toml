@@ -1,0 +1,7 @@
+[mcp_servers.redmine]
+command = "npx"
+args = ["@thelabnyc/redmine-mcp"]
+env_vars = [
+    "REDMINE_URL",
+    "REDMINE_API_KEY",
+]

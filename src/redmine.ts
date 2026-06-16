@@ -96,12 +96,26 @@ export interface RedmineWatcher {
     name: string;
 }
 
+export const relationTypes = [
+    "relates",
+    "duplicates",
+    "duplicated",
+    "blocks",
+    "blocked",
+    "precedes",
+    "follows",
+    "copied_to",
+    "copied_from",
+] as const;
+
+export type RedmineRelationType = (typeof relationTypes)[number];
+
 export interface RedmineRelation {
     id: number;
     issue_id: number;
     issue_to_id: number;
-    relation_type: string;
-    delay?: number;
+    relation_type: RedmineRelationType;
+    delay?: number | null;
 }
 
 /** Data from Redmine Agile plugin. Only present if plugin is installed. */
@@ -195,6 +209,13 @@ export interface CreateIssueData {
     custom_fields?: Array<{ id: number; value: string | string[] }>;
 }
 
+// Issue relation types
+export interface CreateIssueRelationData {
+    issue_to_id: number;
+    relation_type?: RedmineRelationType;
+    delay?: number;
+}
+
 // Time Entry types
 export interface CreateTimeEntryData {
     issue_id: number;
@@ -240,6 +261,14 @@ export interface ListProjectMembersOptions {
 // Internal response types
 interface RedmineIssueResponse {
     issue: RedmineIssue;
+}
+
+interface RedmineRelationsResponse {
+    relations: RedmineRelation[];
+}
+
+interface RedmineRelationResponse {
+    relation: RedmineRelation;
 }
 
 interface RedmineTimeEntryResponse {
@@ -364,6 +393,96 @@ export class RedmineClient {
         } catch {
             // Response body is not JSON or couldn't be parsed
             return "";
+        }
+    }
+
+    async listIssueRelations(issueId: number): Promise<RedmineRelation[]> {
+        const url = `${this.config.redmineUrl}/issues/${issueId}/relations.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch issue relations for issue ${issueId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineRelationsResponse;
+        return data.relations;
+    }
+
+    async getIssueRelation(relationId: number): Promise<RedmineRelation> {
+        const url = `${this.config.redmineUrl}/relations/${relationId}.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch issue relation ${relationId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineRelationResponse;
+        return data.relation;
+    }
+
+    async createIssueRelation(
+        issueId: number,
+        data: CreateIssueRelationData,
+    ): Promise<RedmineRelation> {
+        const url = `${this.config.redmineUrl}/issues/${issueId}/relations.json`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ relation: data }),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to create issue relation for issue ${issueId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const result = (await response.json()) as RedmineRelationResponse;
+        return result.relation;
+    }
+
+    async deleteIssueRelation(relationId: number): Promise<void> {
+        const url = `${this.config.redmineUrl}/relations/${relationId}.json`;
+
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to delete issue relation ${relationId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
         }
     }
 
