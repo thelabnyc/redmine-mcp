@@ -500,6 +500,13 @@ interface RedmineQueriesListResponse {
     limit: number;
 }
 
+interface RedmineSearchResponse {
+    results: RedmineSearchResult[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
 export interface ListMyIssuesOptions {
     statusId?: number | "open" | "closed" | "*";
     projectId?: string | number;
@@ -580,6 +587,40 @@ export interface ListProjectsOptions {
 export interface ListQueriesOptions {
     limit?: number;
     offset?: number;
+}
+
+export interface RedmineSearchResult {
+    id: number;
+    title: string;
+    type: string;
+    url: string;
+    description?: string;
+    datetime?: string;
+}
+
+export interface SearchRedmineOptions {
+    query: string;
+    scope?: string;
+    allWords?: boolean;
+    titlesOnly?: boolean;
+    issues?: boolean;
+    news?: boolean;
+    documents?: boolean;
+    changesets?: boolean;
+    wikiPages?: boolean;
+    messages?: boolean;
+    projects?: boolean;
+    attachments?: boolean | "only";
+    openIssues?: boolean;
+    limit?: number;
+    offset?: number;
+}
+
+export interface SearchRedmineResult {
+    results: RedmineSearchResult[];
+    total_count: number;
+    offset: number;
+    limit: number;
 }
 
 export class RedmineClient {
@@ -1692,6 +1733,84 @@ export class RedmineClient {
 
         return {
             queries: data.queries,
+            total_count: data.total_count,
+            offset: data.offset,
+            limit: data.limit,
+        };
+    }
+
+    async searchRedmine(
+        options: SearchRedmineOptions,
+    ): Promise<SearchRedmineResult> {
+        const params = new URLSearchParams();
+        params.set("q", options.query);
+
+        if (options.scope !== undefined) {
+            params.set("scope", options.scope);
+        }
+
+        if (options.allWords !== undefined) {
+            // Redmine treats all_words= as an explicit false value.
+            params.set("all_words", options.allWords ? "1" : "");
+        }
+
+        const setPresenceParam = (
+            name: string,
+            enabled: boolean | undefined,
+        ): void => {
+            if (enabled === true) {
+                params.set(name, "1");
+            }
+        };
+
+        setPresenceParam("titles_only", options.titlesOnly);
+        setPresenceParam("issues", options.issues);
+        setPresenceParam("news", options.news);
+        setPresenceParam("documents", options.documents);
+        setPresenceParam("changesets", options.changesets);
+        setPresenceParam("wiki_pages", options.wikiPages);
+        setPresenceParam("messages", options.messages);
+        setPresenceParam("projects", options.projects);
+        setPresenceParam("open_issues", options.openIssues);
+
+        if (options.attachments !== undefined) {
+            params.set(
+                "attachments",
+                typeof options.attachments === "boolean"
+                    ? options.attachments
+                        ? "1"
+                        : "0"
+                    : options.attachments,
+            );
+        }
+
+        if (options.limit !== undefined) {
+            params.set("limit", String(options.limit));
+        }
+        if (options.offset !== undefined) {
+            params.set("offset", String(options.offset));
+        }
+
+        const url = `${this.config.redmineUrl}/search.json?${params.toString()}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to search Redmine: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineSearchResponse;
+        return {
+            results: data.results,
             total_count: data.total_count,
             offset: data.offset,
             limit: data.limit,

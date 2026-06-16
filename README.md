@@ -10,6 +10,7 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 - **Log time** spent on issues with integrated time tracking
 - **List issues** with general Redmine filters, saved queries, and optional includes
 - **List issues** assigned to the current user, with filtering and sorting
+- **Search Redmine globally** across issues, projects, wiki pages, attachments, and other content
 - **List projects** accessible to the current user
 - **List saved queries** visible to the current user
 - **List project members** to find user IDs for assignments
@@ -515,6 +516,34 @@ List Redmine issues using general issue filters. This calls Redmine `GET /issues
 **Example usage in Claude:**
 
 > "List open bugs in project 'my-app' updated this month"
+
+### search-redmine
+
+Search Redmine globally using `GET /search.json`. Returns `results`, `total_count`, `offset`, and `limit`.
+
+**Parameters:**
+
+| Parameter     | Type           | Required | Description                                                                                                |
+| ------------- | -------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `query`       | string         | Yes      | Search query, sent as Redmine `q`                                                                          |
+| `scope`       | string         | No       | Optional Redmine search scope                                                                              |
+| `allWords`    | boolean        | No       | `true` requires all words; `false` explicitly disables all words                                           |
+| `titlesOnly`  | boolean        | No       | `true` searches titles only; `false` is omitted                                                            |
+| `issues`      | boolean        | No       | `true` narrows scope to issues; `false` is omitted                                                         |
+| `news`        | boolean        | No       | `true` narrows scope to news; `false` is omitted                                                           |
+| `documents`   | boolean        | No       | `true` narrows scope to documents; `false` is omitted                                                      |
+| `changesets`  | boolean        | No       | `true` narrows scope to changesets; `false` is omitted                                                     |
+| `wikiPages`   | boolean        | No       | `true` narrows scope to wiki pages; `false` is omitted                                                     |
+| `messages`    | boolean        | No       | `true` narrows scope to messages; `false` is omitted                                                       |
+| `projects`    | boolean        | No       | `true` narrows scope to projects; `false` is omitted                                                       |
+| `attachments` | boolean/"only" | No       | `true` includes attachment content, `false` disables attachment search, `"only"` searches attachments only |
+| `openIssues`  | boolean        | No       | `true` restricts issue results to open issues; `false` is omitted                                          |
+| `limit`       | number         | No       | Maximum results to return                                                                                  |
+| `offset`      | number         | No       | Number of results to skip for pagination                                                                   |
+
+**Example usage in Claude:**
+
+> "Search Redmine for cache invalidation across issues and wiki pages"
 
 ### list-projects
 
