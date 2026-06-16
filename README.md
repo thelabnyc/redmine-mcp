@@ -4,15 +4,19 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 
 ## Features
 
-- **Create issues** with full field support including custom fields
+- **Create issues** with full field support including fixed versions, categories, and custom fields
 - **Fetch issue details** by ID, including subject, description, status, priority, and assignee
 - **Update issues**: change status, assign users, add notes, set custom fields, and more
 - **Log time** spent on issues with integrated time tracking
+- **List issues** with general Redmine filters, saved queries, and optional includes
 - **List issues** assigned to the current user, with filtering and sorting
+- **Search Redmine globally** across issues, projects, wiki pages, attachments, and other content
 - **List projects** accessible to the current user
+- **List saved queries** visible to the current user
 - **List project members** to find user IDs for assignments
+- **Manage attachments**: fetch metadata, attach local files, download content, update descriptions, and delete files
 - **Manage issue relations**: list, fetch, create, and delete Redmine relation records
-- **Discover metadata**: list available statuses, trackers, priorities, and custom fields
+- **Discover metadata**: list available statuses, trackers, priorities, versions, categories, and custom fields
 - **Retrieve change history** (journals) with every request
 - Optionally include attachments, watchers, relations, and child issues
 
@@ -35,10 +39,12 @@ npm run build
 
 The server requires two environment variables:
 
-| Variable          | Description                       | Example                     |
-| ----------------- | --------------------------------- | --------------------------- |
-| `REDMINE_URL`     | Base URL of your Redmine instance | `https://mycompany.plan.io` |
-| `REDMINE_API_KEY` | Your Redmine API key              | `abc123def456...`           |
+| Variable                       | Description                                                                             | Example                     |
+| ------------------------------ | --------------------------------------------------------------------------------------- | --------------------------- |
+| `REDMINE_URL`                  | Base URL of your Redmine instance                                                       | `https://mycompany.plan.io` |
+| `REDMINE_API_KEY`              | Your Redmine API key                                                                    | `abc123def456...`           |
+| `REDMINE_MCP_FILE_ROOT`        | Directory that attachment upload paths must stay within; OS temp files are also allowed | `/Users/me/redmine-files`   |
+| `REDMINE_MCP_MAX_UPLOAD_BYTES` | Maximum local file size allowed for `attach-file-to-issue` in bytes                     | `104857600`                 |
 
 ### Getting your Redmine API Key
 
@@ -130,6 +136,83 @@ Fetch details about a Redmine issue by ID.
 
 > "Look up Redmine issue #12345 and summarize the recent activity"
 
+### get-attachment
+
+Fetch metadata for a Redmine attachment by ID.
+
+**Parameters:**
+
+| Parameter      | Type   | Required | Description          |
+| -------------- | ------ | -------- | -------------------- |
+| `attachmentId` | number | Yes      | Attachment record ID |
+
+**Example usage in Claude:**
+
+> "Show me attachment 42"
+
+### attach-file-to-issue
+
+Upload a local file to Redmine and attach it to an issue. The local file must be inside `REDMINE_MCP_FILE_ROOT` or the OS temp directory. Callers must summarize the target issue, file path, filename, description, content type, notes, and private-notes setting in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter      | Type          | Required | Description                                                      |
+| -------------- | ------------- | -------- | ---------------------------------------------------------------- |
+| `issueId`      | string/number | Yes      | Issue ID (e.g., `#12345` or `12345`)                             |
+| `filePath`     | string        | Yes      | Local path to the file to upload                                 |
+| `filename`     | string        | No       | Filename to store in Redmine; defaults to basename of `filePath` |
+| `description`  | string        | No       | Attachment description                                           |
+| `contentType`  | string        | No       | Attachment content type                                          |
+| `notes`        | string        | No       | Optional issue note to add with the upload                       |
+| `privateNotes` | boolean       | No       | Make the issue note private                                      |
+
+**Example usage in Claude:**
+
+> "Attach `/tmp/error.log` to issue #12345 as supporting evidence"
+
+### download-attachment
+
+Download a Redmine attachment's `content_url` to a generated OS temp directory. The tool writes the file using the attachment filename from Redmine and returns the saved path.
+
+**Parameters:**
+
+| Parameter      | Type   | Required | Description          |
+| -------------- | ------ | -------- | -------------------- |
+| `attachmentId` | number | Yes      | Attachment record ID |
+
+**Example usage in Claude:**
+
+> "Download attachment 42"
+
+### update-attachment
+
+Update a Redmine attachment description. Callers must summarize the attachment ID and new description in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter      | Type   | Required | Description                |
+| -------------- | ------ | -------- | -------------------------- |
+| `attachmentId` | number | Yes      | Attachment record ID       |
+| `description`  | string | Yes      | New attachment description |
+
+**Example usage in Claude:**
+
+> "Update attachment 42's description"
+
+### delete-attachment
+
+Delete a Redmine attachment by ID. Callers must summarize the attachment ID and delete action in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter      | Type   | Required | Description          |
+| -------------- | ------ | -------- | -------------------- |
+| `attachmentId` | number | Yes      | Attachment record ID |
+
+**Example usage in Claude:**
+
+> "Delete attachment 42"
+
 ### list-issue-relations
 
 List relation records for a Redmine issue. This exposes Redmine's `GET /issues/:issue_id/relations.json` endpoint.
@@ -191,6 +274,36 @@ Delete a Redmine issue relation record by relation ID. Redmine does not provide 
 
 > "Delete relation 1819"
 
+### add-issue-watcher
+
+Add a watcher to a Redmine issue. Callers must summarize the target issue and watcher user in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter | Type          | Required | Description                          |
+| --------- | ------------- | -------- | ------------------------------------ |
+| `issueId` | string/number | Yes      | Issue ID (e.g., `#12345` or `12345`) |
+| `userId`  | number        | Yes      | Redmine user ID to add as a watcher  |
+
+**Example usage in Claude:**
+
+> "Add user 15 as a watcher on issue #12345"
+
+### remove-issue-watcher
+
+Remove a watcher from a Redmine issue. Callers must summarize the target issue and watcher user in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter | Type          | Required | Description                            |
+| --------- | ------------- | -------- | -------------------------------------- |
+| `issueId` | string/number | Yes      | Issue ID (e.g., `#12345` or `12345`)   |
+| `userId`  | number        | Yes      | Redmine user ID to remove as a watcher |
+
+**Example usage in Claude:**
+
+> "Remove user 15 from the watcher list for issue #12345"
+
 ### create-issue
 
 Create a new Redmine issue.
@@ -207,11 +320,14 @@ Create a new Redmine issue.
 | `assignedToId`   | number        | No       | User ID to assign                                         |
 | `trackerId`      | number        | No       | Tracker ID to set                                         |
 | `parentIssueId`  | number        | No       | Parent issue ID                                           |
+| `fixedVersionId` | number        | No       | Fixed version ID to set                                   |
+| `categoryId`     | number        | No       | Issue category ID to set                                  |
 | `startDate`      | string        | No       | Start date (YYYY-MM-DD format)                            |
 | `dueDate`        | string        | No       | Due date (YYYY-MM-DD format)                              |
 | `doneRatio`      | number        | No       | Percent done (0-100)                                      |
 | `estimatedHours` | number        | No       | Estimated hours for the issue                             |
 | `isPrivate`      | boolean       | No       | Whether the issue is private                              |
+| `watcherUserIds` | number[]      | No       | User IDs to add as issue watchers                         |
 | `customFields`   | array         | No       | Custom field values (see [Custom Fields](#custom-fields)) |
 
 **Example usage in Claude:**
@@ -234,6 +350,8 @@ Update a Redmine issue. Can change fields, add notes, and log time spent.
 | `assignedToId`   | number  | No       | User ID to assign (use 0 to unassign)                     |
 | `trackerId`      | number  | No       | Tracker ID to set                                         |
 | `parentIssueId`  | number  | No       | Parent issue ID                                           |
+| `fixedVersionId` | number  | No       | Fixed version ID to set                                   |
+| `categoryId`     | number  | No       | Issue category ID to set                                  |
 | `startDate`      | string  | No       | Start date (YYYY-MM-DD format)                            |
 | `dueDate`        | string  | No       | Due date (YYYY-MM-DD format)                              |
 | `doneRatio`      | number  | No       | Percent done (0-100)                                      |
@@ -251,6 +369,105 @@ Update a Redmine issue. Can change fields, add notes, and log time spent.
 > "Update issue #12345 to status 2 and assign to user 5"
 >
 > "Add a note to issue #6789 saying 'Fixed the bug' and log 1.5 hours"
+
+### list-time-entries
+
+List Redmine time entries with optional filters and pagination.
+
+**Parameters:**
+
+| Parameter    | Type          | Required | Description                        |
+| ------------ | ------------- | -------- | ---------------------------------- |
+| `issueId`    | string/number | No       | Filter by issue ID                 |
+| `projectId`  | string/number | No       | Filter by project ID or identifier |
+| `userId`     | number/string | No       | Filter by user ID, or `"me"`       |
+| `spentOn`    | string        | No       | Exact spent date (YYYY-MM-DD)      |
+| `from`       | string        | No       | Start date (YYYY-MM-DD)            |
+| `to`         | string        | No       | End date (YYYY-MM-DD)              |
+| `activityId` | number        | No       | Filter by time entry activity ID   |
+| `limit`      | number        | No       | Maximum results to return          |
+| `offset`     | number        | No       | Number of results to skip          |
+
+**Example usage in Claude:**
+
+> "List my time entries for project 'my-app' from 2026-06-01 to 2026-06-30"
+
+### get-time-entry
+
+Fetch one Redmine time entry by ID.
+
+**Parameters:**
+
+| Parameter     | Type   | Required | Description   |
+| ------------- | ------ | -------- | ------------- |
+| `timeEntryId` | number | Yes      | Time entry ID |
+
+**Example usage in Claude:**
+
+> "Show me time entry 100"
+
+### create-time-entry
+
+Create a Redmine time entry for exactly one issue or numeric project ID. Callers must summarize the target issue or project, hours, activity, spent date, comments, and custom fields in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter      | Type          | Required | Description                                                   |
+| -------------- | ------------- | -------- | ------------------------------------------------------------- |
+| `issueId`      | string/number | No       | Issue ID; exactly one of `issueId` or `projectId` is required |
+| `projectId`    | string/number | No       | Numeric project ID; exactly one target is required            |
+| `hours`        | number        | Yes      | Hours to log                                                  |
+| `activityId`   | number        | No       | Time entry activity ID                                        |
+| `spentOn`      | string        | No       | Spent date (YYYY-MM-DD)                                       |
+| `comments`     | string        | No       | Time entry comments                                           |
+| `customFields` | array         | No       | Custom field values                                           |
+
+**Example usage in Claude:**
+
+> "Log 2.5 hours on issue #12345 for development today"
+
+### update-time-entry
+
+Update a Redmine time entry. Redmine returns an empty response to the update request, so this tool fetches and returns the refreshed time entry after the update. Callers must summarize the time entry ID and all planned changes in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter      | Type   | Required | Description             |
+| -------------- | ------ | -------- | ----------------------- |
+| `timeEntryId`  | number | Yes      | Time entry ID           |
+| `hours`        | number | No       | Hours to set            |
+| `activityId`   | number | No       | Time entry activity ID  |
+| `spentOn`      | string | No       | Spent date (YYYY-MM-DD) |
+| `comments`     | string | No       | Time entry comments     |
+| `customFields` | array  | No       | Custom field values     |
+
+**Example usage in Claude:**
+
+> "Update time entry 100 to 3 hours"
+
+### delete-time-entry
+
+Delete a Redmine time entry by ID. Callers must summarize the time entry ID and delete action in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter     | Type   | Required | Description   |
+| ------------- | ------ | -------- | ------------- |
+| `timeEntryId` | number | Yes      | Time entry ID |
+
+**Example usage in Claude:**
+
+> "Delete time entry 100"
+
+### list-time-entry-activities
+
+List Redmine time entry activities. Use this to discover activity IDs before creating or updating time entries.
+
+**Parameters:** None.
+
+**Example usage in Claude:**
+
+> "List available time entry activities"
 
 ### list-my-issues
 
@@ -270,6 +487,62 @@ List issues assigned to the current user, with optional filtering and sorting.
 
 > "What issues are assigned to me?"
 
+### list-issues
+
+List Redmine issues using general issue filters. This calls Redmine `GET /issues.json` and returns full issue objects plus `total_count`, `offset`, and `limit` metadata. Use `list-queries` to discover saved query IDs for the `queryId` parameter.
+
+**Parameters:**
+
+| Parameter            | Type          | Required | Description                                         |
+| -------------------- | ------------- | -------- | --------------------------------------------------- |
+| `issueIds`           | array         | No       | Issue IDs; strings may include `#` prefixes         |
+| `projectId`          | string/number | No       | Filter by project ID or identifier                  |
+| `trackerId`          | number        | No       | Filter by tracker ID                                |
+| `statusId`           | number/string | No       | Filter by status ID, or `"open"`, `"closed"`, `"*"` |
+| `assignedToId`       | number/string | No       | Filter by assignee user ID, or `"me"`               |
+| `parentId`           | number        | No       | Filter by parent issue ID                           |
+| `createdOn`          | string        | No       | Redmine `created_on` filter expression              |
+| `updatedOn`          | string        | No       | Redmine `updated_on` filter expression              |
+| `customFields`       | array         | No       | Custom field filters, serialized as `cf_<id>=value` |
+| `queryId`            | number        | No       | Saved query ID; use `list-queries` to discover IDs  |
+| `includeAttachments` | boolean       | No       | Include issue attachments                           |
+| `includeRelations`   | boolean       | No       | Include issue relations                             |
+| `sort`               | string        | No       | Sort order, e.g. `updated_on:desc`                  |
+| `limit`              | number        | No       | Maximum results to return                           |
+| `offset`             | number        | No       | Number of results to skip for pagination            |
+
+**Example usage in Claude:**
+
+> "List open bugs in project 'my-app' updated this month"
+
+### search-redmine
+
+Search Redmine globally using `GET /search.json`. Returns `results`, `total_count`, `offset`, and `limit`.
+
+**Parameters:**
+
+| Parameter     | Type           | Required | Description                                                                                                |
+| ------------- | -------------- | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `query`       | string         | Yes      | Search query, sent as Redmine `q`                                                                          |
+| `scope`       | string         | No       | Optional Redmine search scope                                                                              |
+| `allWords`    | boolean        | No       | `true` requires all words; `false` explicitly disables all words                                           |
+| `titlesOnly`  | boolean        | No       | `true` searches titles only; `false` is omitted                                                            |
+| `issues`      | boolean        | No       | `true` narrows scope to issues; `false` is omitted                                                         |
+| `news`        | boolean        | No       | `true` narrows scope to news; `false` is omitted                                                           |
+| `documents`   | boolean        | No       | `true` narrows scope to documents; `false` is omitted                                                      |
+| `changesets`  | boolean        | No       | `true` narrows scope to changesets; `false` is omitted                                                     |
+| `wikiPages`   | boolean        | No       | `true` narrows scope to wiki pages; `false` is omitted                                                     |
+| `messages`    | boolean        | No       | `true` narrows scope to messages; `false` is omitted                                                       |
+| `projects`    | boolean        | No       | `true` narrows scope to projects; `false` is omitted                                                       |
+| `attachments` | boolean/"only" | No       | `true` includes attachment content, `false` disables attachment search, `"only"` searches attachments only |
+| `openIssues`  | boolean        | No       | `true` restricts issue results to open issues; `false` is omitted                                          |
+| `limit`       | number         | No       | Maximum results to return                                                                                  |
+| `offset`      | number         | No       | Number of results to skip for pagination                                                                   |
+
+**Example usage in Claude:**
+
+> "Search Redmine for cache invalidation across issues and wiki pages"
+
 ### list-projects
 
 List all projects accessible to the current user.
@@ -284,6 +557,21 @@ List all projects accessible to the current user.
 **Example usage in Claude:**
 
 > "What Redmine projects do I have access to?"
+
+### list-queries
+
+List saved Redmine issue queries visible to the current user.
+
+**Parameters:**
+
+| Parameter | Type   | Required | Description                              |
+| --------- | ------ | -------- | ---------------------------------------- |
+| `limit`   | number | No       | Maximum results to return                |
+| `offset`  | number | No       | Number of results to skip for pagination |
+
+**Example usage in Claude:**
+
+> "What saved Redmine queries can I use?"
 
 ### list-project-members
 
@@ -300,6 +588,34 @@ List all members of a Redmine project. Use this to find user IDs for assigning i
 **Example usage in Claude:**
 
 > "Who can I assign issues to in project 'my-project'?"
+
+### list-project-versions
+
+List versions for a Redmine project. Use this to discover fixed version IDs before setting `fixedVersionId` on `create-issue` or `update-issue`.
+
+**Parameters:**
+
+| Parameter   | Type          | Required | Description                                    |
+| ----------- | ------------- | -------- | ---------------------------------------------- |
+| `projectId` | string/number | Yes      | Project identifier (string slug or numeric ID) |
+
+**Example usage in Claude:**
+
+> "What versions are available for project 'my-app'?"
+
+### list-project-issue-categories
+
+List issue categories for a Redmine project. Use this to discover category IDs before setting `categoryId` on `create-issue` or `update-issue`.
+
+**Parameters:**
+
+| Parameter   | Type          | Required | Description                                    |
+| ----------- | ------------- | -------- | ---------------------------------------------- |
+| `projectId` | string/number | Yes      | Project identifier (string slug or numeric ID) |
+
+**Example usage in Claude:**
+
+> "What issue categories are available for project 'my-app'?"
 
 ### list-issue-statuses
 

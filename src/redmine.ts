@@ -1,4 +1,56 @@
+import { isIP } from "node:net";
+
 import type { Config } from "./config.js";
+
+function encodePathSegment(value: string | number): string {
+    return encodeURIComponent(String(value));
+}
+
+function isPrivateOrLocalHostname(hostname: string): boolean {
+    const normalizedHostname = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+    if (
+        normalizedHostname === "localhost" ||
+        normalizedHostname.endsWith(".localhost")
+    ) {
+        return true;
+    }
+
+    const ipVersion = isIP(normalizedHostname);
+    if (ipVersion === 4) {
+        const octets = normalizedHostname
+            .split(".")
+            .map((part) => Number(part));
+        return (
+            octets[0] === 10 ||
+            octets[0] === 127 ||
+            (octets[0] === 169 && octets[1] === 254) ||
+            (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+            (octets[0] === 192 && octets[1] === 168)
+        );
+    }
+
+    if (ipVersion === 6) {
+        if (normalizedHostname.startsWith("::ffff:")) {
+            return isPrivateOrLocalHostname(
+                normalizedHostname.slice("::ffff:".length),
+            );
+        }
+
+        const firstSegment = Number.parseInt(
+            normalizedHostname.split(":")[0] ?? "",
+            16,
+        );
+
+        return (
+            normalizedHostname === "::1" ||
+            (firstSegment & 0xffc0) === 0xfe80 ||
+            (firstSegment & 0xfe00) === 0xfc00
+        );
+    }
+
+    return false;
+}
 
 export interface RedmineUser {
     id: number;
@@ -31,9 +83,38 @@ export interface RedmineProject {
     name: string;
 }
 
+export interface RedmineVersion {
+    id: number;
+    project: RedmineProject;
+    name: string;
+    description?: string;
+    status: string;
+    due_date?: string;
+    sharing: string;
+    created_on: string;
+    updated_on: string;
+    wiki_page_title?: string;
+    estimated_hours?: number;
+    spent_hours?: number;
+}
+
+export interface RedmineIssueCategory {
+    id: number;
+    project: RedmineProject;
+    name: string;
+    assigned_to?: RedmineUser;
+}
+
 export interface RedmineTracker {
     id: number;
     name: string;
+}
+
+export interface RedmineQuery {
+    id: number;
+    name: string;
+    is_public: boolean;
+    project_id?: number;
 }
 
 export interface RedmineStatus {
@@ -87,6 +168,7 @@ export interface RedmineAttachment {
     filesize: number;
     content_type: string;
     description?: string;
+    content_url?: string;
     author: RedmineUser;
     created_on: string;
 }
@@ -182,6 +264,8 @@ export interface UpdateIssueData {
     assigned_to_id?: number; // Set to 0 to unassign
     tracker_id?: number;
     parent_issue_id?: number;
+    fixed_version_id?: number;
+    category_id?: number;
     start_date?: string; // YYYY-MM-DD
     due_date?: string; // YYYY-MM-DD
     done_ratio?: number; // 0-100
@@ -201,11 +285,14 @@ export interface CreateIssueData {
     assigned_to_id?: number;
     tracker_id?: number;
     parent_issue_id?: number;
+    fixed_version_id?: number;
+    category_id?: number;
     start_date?: string;
     due_date?: string;
     done_ratio?: number;
     estimated_hours?: number;
     is_private?: boolean;
+    watcher_user_ids?: number[];
     custom_fields?: Array<{ id: number; value: string | string[] }>;
 }
 
@@ -216,13 +303,47 @@ export interface CreateIssueRelationData {
     delay?: number;
 }
 
-// Time Entry types
-export interface CreateTimeEntryData {
-    issue_id: number;
+export interface TimeEntryMutationFields {
     hours: number;
     activity_id?: number;
     spent_on?: string; // YYYY-MM-DD
     comments?: string;
+    custom_fields?: Array<{ id: number; value: string | string[] }>;
+}
+
+// Time Entry types
+export type CreateTimeEntryData = TimeEntryMutationFields &
+    (
+        | { issue_id: number; project_id?: never }
+        | { project_id: number; issue_id?: never }
+    );
+
+export type UpdateTimeEntryData = Partial<TimeEntryMutationFields>;
+
+export interface RedmineAttachmentDetailResponse {
+    attachment: RedmineAttachment;
+}
+
+export interface RedmineUploadResult {
+    token: string;
+}
+
+export interface RedmineIssueUpload {
+    token: string;
+    filename: string;
+    content_type?: string;
+    description?: string;
+}
+
+export interface RedmineAttachFileResult {
+    attached: true;
+    issueId: number;
+    upload: RedmineIssueUpload;
+}
+
+export interface RedmineDownloadAttachmentResult {
+    attachment: RedmineAttachment;
+    saved_path: string;
 }
 
 export interface RedmineTimeEntry {
@@ -236,6 +357,7 @@ export interface RedmineTimeEntry {
     spent_on: string;
     created_on: string;
     updated_on: string;
+    custom_fields?: RedmineCustomField[];
 }
 
 export interface RedmineActivity {
@@ -258,6 +380,16 @@ export interface ListProjectMembersOptions {
     offset?: number;
 }
 
+export interface ListProjectVersionsResult {
+    versions: RedmineVersion[];
+    total_count: number;
+}
+
+export interface ListProjectIssueCategoriesResult {
+    issue_categories: RedmineIssueCategory[];
+    total_count: number;
+}
+
 // Internal response types
 interface RedmineIssueResponse {
     issue: RedmineIssue;
@@ -275,8 +407,19 @@ interface RedmineTimeEntryResponse {
     time_entry: RedmineTimeEntry;
 }
 
+interface RedmineTimeEntriesListResponse {
+    time_entries: RedmineTimeEntry[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
 interface RedmineActivitiesResponse {
     time_entry_activities: RedmineActivity[];
+}
+
+interface RedmineUploadResponse {
+    upload: RedmineUploadResult;
 }
 
 interface RedmineMembershipsResponse {
@@ -284,6 +427,16 @@ interface RedmineMembershipsResponse {
     total_count: number;
     offset: number;
     limit: number;
+}
+
+interface RedmineVersionsResponse {
+    versions: RedmineVersion[];
+    total_count?: number;
+}
+
+interface RedmineIssueCategoriesResponse {
+    issue_categories: RedmineIssueCategory[];
+    total_count?: number;
 }
 
 interface RedmineIssueStatusesResponse {
@@ -340,12 +493,70 @@ interface RedmineProjectsListResponse {
     limit: number;
 }
 
+interface RedmineQueriesListResponse {
+    queries: RedmineQuery[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
+interface RedmineSearchResponse {
+    results: RedmineSearchResult[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
 export interface ListMyIssuesOptions {
     statusId?: number | "open" | "closed" | "*";
     projectId?: string | number;
     limit?: number;
     offset?: number;
     sort?: string;
+}
+
+export interface ListIssuesOptions {
+    issueIds?: Array<string | number>;
+    projectId?: string | number;
+    trackerId?: number;
+    statusId?: number | "open" | "closed" | "*";
+    assignedToId?: number | "me";
+    parentId?: number;
+    createdOn?: string;
+    updatedOn?: string;
+    customFields?: Array<{ id: number; value: string }>;
+    queryId?: number;
+    includeAttachments?: boolean;
+    includeRelations?: boolean;
+    sort?: string;
+    limit?: number;
+    offset?: number;
+}
+
+export interface ListIssuesResult {
+    issues: RedmineIssue[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
+export interface ListTimeEntriesOptions {
+    issueId?: string | number;
+    projectId?: string | number;
+    userId?: number | "me";
+    spentOn?: string;
+    from?: string;
+    to?: string;
+    activityId?: number;
+    limit?: number;
+    offset?: number;
+}
+
+export interface ListTimeEntriesResult {
+    time_entries: RedmineTimeEntry[];
+    total_count: number;
+    offset: number;
+    limit: number;
 }
 
 export interface RedmineIssueSummary {
@@ -373,6 +584,45 @@ export interface ListProjectsOptions {
     offset?: number;
 }
 
+export interface ListQueriesOptions {
+    limit?: number;
+    offset?: number;
+}
+
+export interface RedmineSearchResult {
+    id: number;
+    title: string;
+    type: string;
+    url: string;
+    description?: string;
+    datetime?: string;
+}
+
+export interface SearchRedmineOptions {
+    query: string;
+    scope?: string;
+    allWords?: boolean;
+    titlesOnly?: boolean;
+    issues?: boolean;
+    news?: boolean;
+    documents?: boolean;
+    changesets?: boolean;
+    wikiPages?: boolean;
+    messages?: boolean;
+    projects?: boolean;
+    attachments?: boolean | "only";
+    openIssues?: boolean;
+    limit?: number;
+    offset?: number;
+}
+
+export interface SearchRedmineResult {
+    results: RedmineSearchResult[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
 export class RedmineClient {
     private readonly config: Config;
 
@@ -393,6 +643,30 @@ export class RedmineClient {
         } catch {
             // Response body is not JSON or couldn't be parsed
             return "";
+        }
+    }
+
+    private validateAttachmentDownloadUrl(
+        attachmentId: number,
+        downloadUrl: URL,
+        redmineOrigin: string,
+    ): void {
+        if (
+            downloadUrl.protocol !== "http:" &&
+            downloadUrl.protocol !== "https:"
+        ) {
+            throw new Error(
+                `Failed to download attachment ${attachmentId}: unsupported attachment URL protocol ${downloadUrl.protocol}`,
+            );
+        }
+
+        if (
+            downloadUrl.origin !== redmineOrigin &&
+            isPrivateOrLocalHostname(downloadUrl.hostname)
+        ) {
+            throw new Error(
+                `Failed to download attachment ${attachmentId}: refused unsafe attachment URL ${downloadUrl.toString()}`,
+            );
         }
     }
 
@@ -482,6 +756,244 @@ export class RedmineClient {
             const errorDetails = await this.extractErrorDetails(response);
             throw new Error(
                 `Failed to delete issue relation ${relationId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+    }
+
+    async addIssueWatcher(issueId: number, userId: number): Promise<void> {
+        const url = `${this.config.redmineUrl}/issues/${issueId}/watchers.json`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ user_id: userId }),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to add watcher ${userId} to issue ${issueId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+    }
+
+    async removeIssueWatcher(issueId: number, userId: number): Promise<void> {
+        const url = `${this.config.redmineUrl}/issues/${issueId}/watchers/${userId}.json`;
+
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to remove watcher ${userId} from issue ${issueId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+    }
+
+    async getAttachment(attachmentId: number): Promise<RedmineAttachment> {
+        const url = `${this.config.redmineUrl}/attachments/${attachmentId}.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch attachment ${attachmentId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineAttachmentDetailResponse;
+        return data.attachment;
+    }
+
+    async uploadAttachment(
+        filename: string,
+        fileBytes: Buffer,
+    ): Promise<RedmineUploadResult> {
+        const params = new URLSearchParams({ filename });
+        const url = `${this.config.redmineUrl}/uploads.json?${params.toString()}`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/octet-stream",
+            },
+            body: fileBytes,
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to upload attachment ${filename}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineUploadResponse;
+        return data.upload;
+    }
+
+    async attachUploadedFileToIssue(
+        issueId: number,
+        upload: RedmineIssueUpload,
+        options: { notes?: string; privateNotes?: boolean } = {},
+    ): Promise<RedmineAttachFileResult> {
+        const url = `${this.config.redmineUrl}/issues/${issueId}.json`;
+        const issue: {
+            uploads: RedmineIssueUpload[];
+            notes?: string;
+            private_notes?: boolean;
+        } = { uploads: [upload] };
+
+        if (options.notes !== undefined) {
+            issue.notes = options.notes;
+        }
+        if (options.privateNotes !== undefined) {
+            issue.private_notes = options.privateNotes;
+        }
+
+        const response = await fetch(url, {
+            method: "PUT",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ issue }),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to attach file to issue ${issueId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        return { attached: true, issueId, upload };
+    }
+
+    async downloadAttachmentContent(
+        attachmentId: number,
+        contentUrl: string,
+    ): Promise<ArrayBuffer> {
+        const redmineOrigin = new URL(this.config.redmineUrl).origin;
+        let downloadUrl = new URL(contentUrl, this.config.redmineUrl);
+
+        for (let redirects = 0; redirects < 5; redirects += 1) {
+            this.validateAttachmentDownloadUrl(
+                attachmentId,
+                downloadUrl,
+                redmineOrigin,
+            );
+
+            const headers: Record<string, string> = {
+                Accept: "application/octet-stream",
+            };
+
+            if (downloadUrl.origin === redmineOrigin) {
+                headers["X-Redmine-API-Key"] = this.config.redmineApiKey;
+            }
+
+            const response = await fetch(downloadUrl.toString(), {
+                method: "GET",
+                headers,
+                redirect: "manual",
+            });
+
+            if (
+                response.status >= 300 &&
+                response.status < 400 &&
+                response.headers.get("location") !== null
+            ) {
+                const redirectUrl = new URL(
+                    response.headers.get("location") ?? "",
+                    downloadUrl,
+                );
+
+                if (
+                    downloadUrl.origin === redmineOrigin &&
+                    redirectUrl.origin !== redmineOrigin
+                ) {
+                    throw new Error(
+                        `Failed to download attachment ${attachmentId}: refused cross-origin redirect to ${redirectUrl.toString()}`,
+                    );
+                }
+
+                downloadUrl = redirectUrl;
+                continue;
+            }
+
+            if (!response.ok) {
+                const errorDetails = await this.extractErrorDetails(response);
+                throw new Error(
+                    `Failed to download attachment ${attachmentId}: ${response.status} ${response.statusText}${errorDetails}`,
+                );
+            }
+
+            return response.arrayBuffer();
+        }
+
+        throw new Error(
+            `Failed to download attachment ${attachmentId}: too many redirects`,
+        );
+    }
+
+    async updateAttachment(
+        attachmentId: number,
+        description: string,
+    ): Promise<void> {
+        const url = `${this.config.redmineUrl}/attachments/${attachmentId}.json`;
+
+        const response = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ attachment: { description } }),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to update attachment ${attachmentId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+    }
+
+    async deleteAttachment(attachmentId: number): Promise<void> {
+        const url = `${this.config.redmineUrl}/attachments/${attachmentId}.json`;
+
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to delete attachment ${attachmentId}: ${response.status} ${response.statusText}${errorDetails}`,
             );
         }
     }
@@ -597,6 +1109,133 @@ export class RedmineClient {
         return result.time_entry;
     }
 
+    async listTimeEntries(
+        options: ListTimeEntriesOptions = {},
+    ): Promise<ListTimeEntriesResult> {
+        const params = new URLSearchParams();
+
+        if (options.issueId !== undefined) {
+            params.set("issue_id", String(options.issueId).replace(/^#/, ""));
+        }
+        if (options.projectId !== undefined) {
+            params.set("project_id", String(options.projectId));
+        }
+        if (options.userId !== undefined) {
+            params.set("user_id", String(options.userId));
+        }
+        if (options.spentOn !== undefined) {
+            params.set("spent_on", options.spentOn);
+        }
+        if (options.from !== undefined) {
+            params.set("from", options.from);
+        }
+        if (options.to !== undefined) {
+            params.set("to", options.to);
+        }
+        if (options.activityId !== undefined) {
+            params.set("activity_id", String(options.activityId));
+        }
+        if (options.limit !== undefined) {
+            params.set("limit", String(options.limit));
+        }
+        if (options.offset !== undefined) {
+            params.set("offset", String(options.offset));
+        }
+
+        const queryString = params.toString();
+        const url = `${this.config.redmineUrl}/time_entries.json${queryString ? `?${queryString}` : ""}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch time entries: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineTimeEntriesListResponse;
+        return {
+            time_entries: data.time_entries,
+            total_count: data.total_count,
+            offset: data.offset,
+            limit: data.limit,
+        };
+    }
+
+    async getTimeEntry(timeEntryId: number): Promise<RedmineTimeEntry> {
+        const url = `${this.config.redmineUrl}/time_entries/${timeEntryId}.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch time entry ${timeEntryId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineTimeEntryResponse;
+        return data.time_entry;
+    }
+
+    async updateTimeEntry(
+        timeEntryId: number,
+        data: UpdateTimeEntryData,
+    ): Promise<RedmineTimeEntry> {
+        const url = `${this.config.redmineUrl}/time_entries/${timeEntryId}.json`;
+
+        const response = await fetch(url, {
+            method: "PUT",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ time_entry: data }),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to update time entry ${timeEntryId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        return this.getTimeEntry(timeEntryId);
+    }
+
+    async deleteTimeEntry(timeEntryId: number): Promise<void> {
+        const url = `${this.config.redmineUrl}/time_entries/${timeEntryId}.json`;
+
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to delete time entry ${timeEntryId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+    }
+
     async getTimeEntryActivities(): Promise<RedmineActivity[]> {
         const url = `${this.config.redmineUrl}/enumerations/time_entry_activities.json`;
 
@@ -660,6 +1299,62 @@ export class RedmineClient {
             total_count: data.total_count,
             offset: data.offset,
             limit: data.limit,
+        };
+    }
+
+    async listProjectVersions(
+        projectId: string | number,
+    ): Promise<ListProjectVersionsResult> {
+        const encodedProjectId = encodePathSegment(projectId);
+        const url = `${this.config.redmineUrl}/projects/${encodedProjectId}/versions.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch project versions: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineVersionsResponse;
+        return {
+            versions: data.versions,
+            total_count: data.total_count ?? data.versions.length,
+        };
+    }
+
+    async listProjectIssueCategories(
+        projectId: string | number,
+    ): Promise<ListProjectIssueCategoriesResult> {
+        const encodedProjectId = encodePathSegment(projectId);
+        const url = `${this.config.redmineUrl}/projects/${encodedProjectId}/issue_categories.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch project issue categories: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineIssueCategoriesResponse;
+        return {
+            issue_categories: data.issue_categories,
+            total_count: data.total_count ?? data.issue_categories.length,
         };
     }
 
@@ -801,6 +1496,91 @@ export class RedmineClient {
         return user;
     }
 
+    async listIssues(
+        options: ListIssuesOptions = {},
+    ): Promise<ListIssuesResult> {
+        const params = new URLSearchParams();
+
+        if (options.issueIds !== undefined) {
+            params.set(
+                "issue_id",
+                options.issueIds
+                    .map((issueId) => String(issueId).replace(/^#/, ""))
+                    .join(","),
+            );
+        }
+        if (options.projectId !== undefined) {
+            params.set("project_id", String(options.projectId));
+        }
+        if (options.trackerId !== undefined) {
+            params.set("tracker_id", String(options.trackerId));
+        }
+        if (options.statusId !== undefined) {
+            params.set("status_id", String(options.statusId));
+        }
+        if (options.assignedToId !== undefined) {
+            params.set("assigned_to_id", String(options.assignedToId));
+        }
+        if (options.parentId !== undefined) {
+            params.set("parent_id", String(options.parentId));
+        }
+        if (options.createdOn !== undefined) {
+            params.set("created_on", options.createdOn);
+        }
+        if (options.updatedOn !== undefined) {
+            params.set("updated_on", options.updatedOn);
+        }
+        for (const customField of options.customFields ?? []) {
+            params.set(`cf_${customField.id}`, customField.value);
+        }
+        if (options.queryId !== undefined) {
+            params.set("query_id", String(options.queryId));
+        }
+
+        const includes: string[] = [];
+        if (options.includeAttachments) includes.push("attachments");
+        if (options.includeRelations) includes.push("relations");
+        if (includes.length > 0) {
+            params.set("include", includes.join(","));
+        }
+
+        if (options.sort !== undefined) {
+            params.set("sort", options.sort);
+        }
+        if (options.limit !== undefined) {
+            params.set("limit", String(options.limit));
+        }
+        if (options.offset !== undefined) {
+            params.set("offset", String(options.offset));
+        }
+
+        const queryString = params.toString();
+        const url = `${this.config.redmineUrl}/issues.json${queryString ? `?${queryString}` : ""}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch issues: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineIssuesListResponse;
+        return {
+            issues: data.issues,
+            total_count: data.total_count,
+            offset: data.offset,
+            limit: data.limit,
+        };
+    }
+
     async listMyIssues(options: ListMyIssuesOptions = {}): Promise<{
         issues: RedmineIssueSummary[];
         total_count: number;
@@ -913,6 +1693,127 @@ export class RedmineClient {
 
         return {
             projects: summaries,
+            total_count: data.total_count,
+            offset: data.offset,
+            limit: data.limit,
+        };
+    }
+
+    async listQueries(options: ListQueriesOptions = {}): Promise<{
+        queries: RedmineQuery[];
+        total_count: number;
+        offset: number;
+        limit: number;
+    }> {
+        const params = new URLSearchParams();
+
+        if (options.limit !== undefined) {
+            params.set("limit", String(options.limit));
+        }
+        if (options.offset !== undefined) {
+            params.set("offset", String(options.offset));
+        }
+
+        const queryString = params.toString();
+        const url = `${this.config.redmineUrl}/queries.json${queryString ? `?${queryString}` : ""}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch queries: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineQueriesListResponse;
+
+        return {
+            queries: data.queries,
+            total_count: data.total_count,
+            offset: data.offset,
+            limit: data.limit,
+        };
+    }
+
+    async searchRedmine(
+        options: SearchRedmineOptions,
+    ): Promise<SearchRedmineResult> {
+        const params = new URLSearchParams();
+        params.set("q", options.query);
+
+        if (options.scope !== undefined) {
+            params.set("scope", options.scope);
+        }
+
+        if (options.allWords !== undefined) {
+            // Redmine treats all_words= as an explicit false value.
+            params.set("all_words", options.allWords ? "1" : "");
+        }
+
+        const setPresenceParam = (
+            name: string,
+            enabled: boolean | undefined,
+        ): void => {
+            if (enabled === true) {
+                params.set(name, "1");
+            }
+        };
+
+        setPresenceParam("titles_only", options.titlesOnly);
+        setPresenceParam("issues", options.issues);
+        setPresenceParam("news", options.news);
+        setPresenceParam("documents", options.documents);
+        setPresenceParam("changesets", options.changesets);
+        setPresenceParam("wiki_pages", options.wikiPages);
+        setPresenceParam("messages", options.messages);
+        setPresenceParam("projects", options.projects);
+        setPresenceParam("open_issues", options.openIssues);
+
+        if (options.attachments !== undefined) {
+            params.set(
+                "attachments",
+                typeof options.attachments === "boolean"
+                    ? options.attachments
+                        ? "1"
+                        : "0"
+                    : options.attachments,
+            );
+        }
+
+        if (options.limit !== undefined) {
+            params.set("limit", String(options.limit));
+        }
+        if (options.offset !== undefined) {
+            params.set("offset", String(options.offset));
+        }
+
+        const url = `${this.config.redmineUrl}/search.json?${params.toString()}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to search Redmine: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineSearchResponse;
+        return {
+            results: data.results,
             total_count: data.total_count,
             offset: data.offset,
             limit: data.limit,

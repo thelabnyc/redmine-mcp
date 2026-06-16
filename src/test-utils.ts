@@ -42,6 +42,8 @@ export interface IssueRequestBody {
         assigned_to_id?: number;
         tracker_id?: number;
         parent_issue_id?: number;
+        fixed_version_id?: number;
+        category_id?: number;
         start_date?: string;
         due_date?: string;
         done_ratio?: number;
@@ -62,11 +64,14 @@ export interface CreateIssueRequestBody {
         assigned_to_id?: number;
         tracker_id?: number;
         parent_issue_id?: number;
+        fixed_version_id?: number;
+        category_id?: number;
         start_date?: string;
         due_date?: string;
         done_ratio?: number;
         estimated_hours?: number;
         is_private?: boolean;
+        watcher_user_ids?: number[];
         custom_fields?: Array<{ id: number; value: string | string[] }>;
     };
 }
@@ -226,4 +231,6 @@ export function setupTestEnv() {
 export function cleanupTestEnv() {
     delete process.env.REDMINE_URL;
     delete process.env.REDMINE_API_KEY;
+    delete process.env.REDMINE_MCP_FILE_ROOT;
+    delete process.env.REDMINE_MCP_MAX_UPLOAD_BYTES;
 }

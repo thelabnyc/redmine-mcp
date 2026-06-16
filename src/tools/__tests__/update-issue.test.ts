@@ -459,6 +459,45 @@ describe("update-issue tool", () => {
         }
     });
 
+    it("updates issue with fixed version and category", async () => {
+        mockFetch
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve({}),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve(sampleUpdatedIssueResponse),
+            });
+
+        const { client, cleanup } = await createTestClientServer();
+
+        try {
+            await client.callTool({
+                name: "update-issue",
+                arguments: {
+                    issueId: "12345",
+                    fixedVersionId: 7,
+                    categoryId: 3,
+                },
+            });
+
+            const [, putOptions] = mockFetch.mock.calls[0] as [
+                string,
+                RequestInit,
+            ];
+            const body = JSON.parse(
+                putOptions.body as string,
+            ) as IssueRequestBody;
+            expect(body.issue.fixed_version_id).toBe(7);
+            expect(body.issue.category_id).toBe(3);
+        } finally {
+            await cleanup();
+        }
+    });
+
     it("handles issue ID with # prefix", async () => {
         mockFetch
             .mockResolvedValueOnce({

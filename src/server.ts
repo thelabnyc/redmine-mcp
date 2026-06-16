@@ -17,7 +17,7 @@ export function createServer(): McpServer {
         version: "0.4.0",
     });
 
-    registerAllTools(server, redmineClient);
+    registerAllTools(server, redmineClient, config);
 
     return server;
 }
