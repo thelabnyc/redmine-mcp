@@ -292,6 +292,7 @@ export interface CreateIssueData {
     done_ratio?: number;
     estimated_hours?: number;
     is_private?: boolean;
+    watcher_user_ids?: number[];
     custom_fields?: Array<{ id: number; value: string | string[] }>;
 }
 
@@ -711,6 +712,46 @@ export class RedmineClient {
             const errorDetails = await this.extractErrorDetails(response);
             throw new Error(
                 `Failed to delete issue relation ${relationId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+    }
+
+    async addIssueWatcher(issueId: number, userId: number): Promise<void> {
+        const url = `${this.config.redmineUrl}/issues/${issueId}/watchers.json`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ user_id: userId }),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to add watcher ${userId} to issue ${issueId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+    }
+
+    async removeIssueWatcher(issueId: number, userId: number): Promise<void> {
+        const url = `${this.config.redmineUrl}/issues/${issueId}/watchers/${userId}.json`;
+
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to remove watcher ${userId} from issue ${issueId}: ${response.status} ${response.statusText}${errorDetails}`,
             );
         }
     }

@@ -68,6 +68,10 @@ export function registerCreateIssueTool(
                     .boolean()
                     .optional()
                     .describe("Whether the issue is private"),
+                watcherUserIds: z
+                    .array(z.number().int().positive())
+                    .optional()
+                    .describe("User IDs to add as issue watchers"),
                 customFields: z
                     .array(
                         z.object({
@@ -101,6 +105,7 @@ export function registerCreateIssueTool(
             doneRatio,
             estimatedHours,
             isPrivate,
+            watcherUserIds,
             customFields,
         }) => {
             try {
@@ -128,6 +133,8 @@ export function registerCreateIssueTool(
                 if (estimatedHours !== undefined)
                     createData.estimated_hours = estimatedHours;
                 if (isPrivate !== undefined) createData.is_private = isPrivate;
+                if (watcherUserIds !== undefined)
+                    createData.watcher_user_ids = watcherUserIds;
                 if (customFields !== undefined)
                     createData.custom_fields = customFields;
 

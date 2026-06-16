@@ -275,6 +275,36 @@ Delete a Redmine issue relation record by relation ID. Redmine does not provide 
 
 > "Delete relation 1819"
 
+### add-issue-watcher
+
+Add a watcher to a Redmine issue. Callers must summarize the target issue and watcher user in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter | Type          | Required | Description                          |
+| --------- | ------------- | -------- | ------------------------------------ |
+| `issueId` | string/number | Yes      | Issue ID (e.g., `#12345` or `12345`) |
+| `userId`  | number        | Yes      | Redmine user ID to add as a watcher  |
+
+**Example usage in Claude:**
+
+> "Add user 15 as a watcher on issue #12345"
+
+### remove-issue-watcher
+
+Remove a watcher from a Redmine issue. Callers must summarize the target issue and watcher user in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter | Type          | Required | Description                            |
+| --------- | ------------- | -------- | -------------------------------------- |
+| `issueId` | string/number | Yes      | Issue ID (e.g., `#12345` or `12345`)   |
+| `userId`  | number        | Yes      | Redmine user ID to remove as a watcher |
+
+**Example usage in Claude:**
+
+> "Remove user 15 from the watcher list for issue #12345"
+
 ### create-issue
 
 Create a new Redmine issue.
@@ -298,6 +328,7 @@ Create a new Redmine issue.
 | `doneRatio`      | number        | No       | Percent done (0-100)                                      |
 | `estimatedHours` | number        | No       | Estimated hours for the issue                             |
 | `isPrivate`      | boolean       | No       | Whether the issue is private                              |
+| `watcherUserIds` | number[]      | No       | User IDs to add as issue watchers                         |
 | `customFields`   | array         | No       | Custom field values (see [Custom Fields](#custom-fields)) |
 
 **Example usage in Claude:**

@@ -71,6 +71,7 @@ export interface CreateIssueRequestBody {
         done_ratio?: number;
         estimated_hours?: number;
         is_private?: boolean;
+        watcher_user_ids?: number[];
         custom_fields?: Array<{ id: number; value: string | string[] }>;
     };
 }

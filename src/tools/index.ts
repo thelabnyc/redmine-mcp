@@ -19,6 +19,7 @@ import { registerListQueriesTool } from "./list-queries.js";
 import { registerListTrackersTool } from "./list-trackers.js";
 import { registerTimeEntryTools } from "./time-entries.js";
 import { registerUpdateIssueTool } from "./update-issue.js";
+import { registerWatcherTools } from "./watchers.js";
 import { registerWhoamiTool } from "./whoami.js";
 
 export function registerAllTools(
@@ -43,6 +44,7 @@ export function registerAllTools(
     registerListTrackersTool(server, redmineClient);
     registerTimeEntryTools(server, redmineClient);
     registerUpdateIssueTool(server, redmineClient);
+    registerWatcherTools(server, redmineClient);
     registerWhoamiTool(server, redmineClient);
 }
 
@@ -64,5 +66,6 @@ export {
     registerListTrackersTool,
     registerTimeEntryTools,
     registerUpdateIssueTool,
+    registerWatcherTools,
     registerWhoamiTool,
 };

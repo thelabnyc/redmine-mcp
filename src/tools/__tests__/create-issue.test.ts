@@ -298,6 +298,44 @@ describe("create-issue tool", () => {
         }
     });
 
+    it("creates issue with watcher user IDs", async () => {
+        mockFetch
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 201,
+                json: () => Promise.resolve(sampleCreatedIssueResponse),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve(sampleGetIssueResponse),
+            });
+
+        const { client, cleanup } = await createTestClientServer();
+
+        try {
+            await client.callTool({
+                name: "create-issue",
+                arguments: {
+                    projectId: "test-project",
+                    subject: "Issue with watchers",
+                    watcherUserIds: [11, 12],
+                },
+            });
+
+            const [, postOptions] = mockFetch.mock.calls[0] as [
+                string,
+                RequestInit,
+            ];
+            const body = JSON.parse(
+                postOptions.body as string,
+            ) as CreateIssueRequestBody;
+            expect(body.issue.watcher_user_ids).toEqual([11, 12]);
+        } finally {
+            await cleanup();
+        }
+    });
+
     it("creates issue with fixed version and category", async () => {
         mockFetch
             .mockResolvedValueOnce({
