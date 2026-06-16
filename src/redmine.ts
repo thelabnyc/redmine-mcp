@@ -1,7 +1,55 @@
+import { isIP } from "node:net";
+
 import type { Config } from "./config.js";
 
 function encodePathSegment(value: string | number): string {
     return encodeURIComponent(String(value));
+}
+
+function isPrivateOrLocalHostname(hostname: string): boolean {
+    const normalizedHostname = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+    if (
+        normalizedHostname === "localhost" ||
+        normalizedHostname.endsWith(".localhost")
+    ) {
+        return true;
+    }
+
+    const ipVersion = isIP(normalizedHostname);
+    if (ipVersion === 4) {
+        const octets = normalizedHostname
+            .split(".")
+            .map((part) => Number(part));
+        return (
+            octets[0] === 10 ||
+            octets[0] === 127 ||
+            (octets[0] === 169 && octets[1] === 254) ||
+            (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+            (octets[0] === 192 && octets[1] === 168)
+        );
+    }
+
+    if (ipVersion === 6) {
+        if (normalizedHostname.startsWith("::ffff:")) {
+            return isPrivateOrLocalHostname(
+                normalizedHostname.slice("::ffff:".length),
+            );
+        }
+
+        const firstSegment = Number.parseInt(
+            normalizedHostname.split(":")[0] ?? "",
+            16,
+        );
+
+        return (
+            normalizedHostname === "::1" ||
+            ((firstSegment & 0xffc0) === 0xfe80 ||
+                (firstSegment & 0xfe00) === 0xfc00)
+        );
+    }
+
+    return false;
 }
 
 export interface RedmineUser {
@@ -120,6 +168,7 @@ export interface RedmineAttachment {
     filesize: number;
     content_type: string;
     description?: string;
+    content_url?: string;
     author: RedmineUser;
     created_on: string;
 }
@@ -262,6 +311,32 @@ export interface CreateTimeEntryData {
     comments?: string;
 }
 
+export interface RedmineAttachmentDetailResponse {
+    attachment: RedmineAttachment;
+}
+
+export interface RedmineUploadResult {
+    token: string;
+}
+
+export interface RedmineIssueUpload {
+    token: string;
+    filename: string;
+    content_type?: string;
+    description?: string;
+}
+
+export interface RedmineAttachFileResult {
+    attached: true;
+    issueId: number;
+    upload: RedmineIssueUpload;
+}
+
+export interface RedmineDownloadAttachmentResult {
+    attachment: RedmineAttachment;
+    saved_path: string;
+}
+
 export interface RedmineTimeEntry {
     id: number;
     project: RedmineProject;
@@ -324,6 +399,10 @@ interface RedmineTimeEntryResponse {
 
 interface RedmineActivitiesResponse {
     time_entry_activities: RedmineActivity[];
+}
+
+interface RedmineUploadResponse {
+    upload: RedmineUploadResult;
 }
 
 interface RedmineMembershipsResponse {
@@ -490,6 +569,27 @@ export class RedmineClient {
         }
     }
 
+    private validateAttachmentDownloadUrl(
+        attachmentId: number,
+        downloadUrl: URL,
+        redmineOrigin: string,
+    ): void {
+        if (downloadUrl.protocol !== "http:" && downloadUrl.protocol !== "https:") {
+            throw new Error(
+                `Failed to download attachment ${attachmentId}: unsupported attachment URL protocol ${downloadUrl.protocol}`,
+            );
+        }
+
+        if (
+            downloadUrl.origin !== redmineOrigin &&
+            isPrivateOrLocalHostname(downloadUrl.hostname)
+        ) {
+            throw new Error(
+                `Failed to download attachment ${attachmentId}: refused unsafe attachment URL ${downloadUrl.toString()}`,
+            );
+        }
+    }
+
     async listIssueRelations(issueId: number): Promise<RedmineRelation[]> {
         const url = `${this.config.redmineUrl}/issues/${issueId}/relations.json`;
 
@@ -576,6 +676,204 @@ export class RedmineClient {
             const errorDetails = await this.extractErrorDetails(response);
             throw new Error(
                 `Failed to delete issue relation ${relationId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+    }
+
+    async getAttachment(attachmentId: number): Promise<RedmineAttachment> {
+        const url = `${this.config.redmineUrl}/attachments/${attachmentId}.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch attachment ${attachmentId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineAttachmentDetailResponse;
+        return data.attachment;
+    }
+
+    async uploadAttachment(
+        filename: string,
+        fileBytes: Buffer,
+    ): Promise<RedmineUploadResult> {
+        const params = new URLSearchParams({ filename });
+        const url = `${this.config.redmineUrl}/uploads.json?${params.toString()}`;
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/octet-stream",
+            },
+            body: fileBytes,
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to upload attachment ${filename}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineUploadResponse;
+        return data.upload;
+    }
+
+    async attachUploadedFileToIssue(
+        issueId: number,
+        upload: RedmineIssueUpload,
+        options: { notes?: string; privateNotes?: boolean } = {},
+    ): Promise<RedmineAttachFileResult> {
+        const url = `${this.config.redmineUrl}/issues/${issueId}.json`;
+        const issue: {
+            uploads: RedmineIssueUpload[];
+            notes?: string;
+            private_notes?: boolean;
+        } = { uploads: [upload] };
+
+        if (options.notes !== undefined) {
+            issue.notes = options.notes;
+        }
+        if (options.privateNotes !== undefined) {
+            issue.private_notes = options.privateNotes;
+        }
+
+        const response = await fetch(url, {
+            method: "PUT",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ issue }),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to attach file to issue ${issueId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        return { attached: true, issueId, upload };
+    }
+
+    async downloadAttachmentContent(
+        attachmentId: number,
+        contentUrl: string,
+    ): Promise<ArrayBuffer> {
+        const redmineOrigin = new URL(this.config.redmineUrl).origin;
+        let downloadUrl = new URL(contentUrl, this.config.redmineUrl);
+
+        for (let redirects = 0; redirects < 5; redirects += 1) {
+            this.validateAttachmentDownloadUrl(
+                attachmentId,
+                downloadUrl,
+                redmineOrigin,
+            );
+
+            const headers: Record<string, string> = {
+                Accept: "application/octet-stream",
+            };
+
+            if (downloadUrl.origin === redmineOrigin) {
+                headers["X-Redmine-API-Key"] = this.config.redmineApiKey;
+            }
+
+            const response = await fetch(downloadUrl.toString(), {
+                method: "GET",
+                headers,
+                redirect: "manual",
+            });
+
+            if (
+                response.status >= 300 &&
+                response.status < 400 &&
+                response.headers.get("location") !== null
+            ) {
+                const redirectUrl = new URL(
+                    response.headers.get("location") ?? "",
+                    downloadUrl,
+                );
+
+                if (
+                    downloadUrl.origin === redmineOrigin &&
+                    redirectUrl.origin !== redmineOrigin
+                ) {
+                    throw new Error(
+                        `Failed to download attachment ${attachmentId}: refused cross-origin redirect to ${redirectUrl.toString()}`,
+                    );
+                }
+
+                downloadUrl = redirectUrl;
+                continue;
+            }
+
+            if (!response.ok) {
+                const errorDetails = await this.extractErrorDetails(response);
+                throw new Error(
+                    `Failed to download attachment ${attachmentId}: ${response.status} ${response.statusText}${errorDetails}`,
+                );
+            }
+
+            return response.arrayBuffer();
+        }
+
+        throw new Error(
+            `Failed to download attachment ${attachmentId}: too many redirects`,
+        );
+    }
+
+    async updateAttachment(
+        attachmentId: number,
+        description: string,
+    ): Promise<void> {
+        const url = `${this.config.redmineUrl}/attachments/${attachmentId}.json`;
+
+        const response = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ attachment: { description } }),
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to update attachment ${attachmentId}: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+    }
+
+    async deleteAttachment(attachmentId: number): Promise<void> {
+        const url = `${this.config.redmineUrl}/attachments/${attachmentId}.json`;
+
+        const response = await fetch(url, {
+            method: "DELETE",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to delete attachment ${attachmentId}: ${response.status} ${response.statusText}${errorDetails}`,
             );
         }
     }

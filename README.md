@@ -13,6 +13,7 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 - **List projects** accessible to the current user
 - **List saved queries** visible to the current user
 - **List project members** to find user IDs for assignments
+- **Manage attachments**: fetch metadata, attach local files, download content, update descriptions, and delete files
 - **Manage issue relations**: list, fetch, create, and delete Redmine relation records
 - **Discover metadata**: list available statuses, trackers, priorities, versions, categories, and custom fields
 - **Retrieve change history** (journals) with every request
@@ -37,10 +38,12 @@ npm run build
 
 The server requires two environment variables:
 
-| Variable          | Description                       | Example                     |
-| ----------------- | --------------------------------- | --------------------------- |
-| `REDMINE_URL`     | Base URL of your Redmine instance | `https://mycompany.plan.io` |
-| `REDMINE_API_KEY` | Your Redmine API key              | `abc123def456...`           |
+| Variable                       | Description                                                           | Example                     |
+| ------------------------------ | --------------------------------------------------------------------- | --------------------------- |
+| `REDMINE_URL`                  | Base URL of your Redmine instance                                     | `https://mycompany.plan.io` |
+| `REDMINE_API_KEY`              | Your Redmine API key                                                  | `abc123def456...`           |
+| `REDMINE_MCP_FILE_ROOT`        | Directory that attachment upload/download paths must stay within      | `/Users/me/redmine-files`   |
+| `REDMINE_MCP_MAX_UPLOAD_BYTES` | Maximum local file size allowed for `attach-file-to-issue` in bytes   | `104857600`                 |
 
 ### Getting your Redmine API Key
 
@@ -131,6 +134,85 @@ Fetch details about a Redmine issue by ID.
 **Example usage in Claude:**
 
 > "Look up Redmine issue #12345 and summarize the recent activity"
+
+### get-attachment
+
+Fetch metadata for a Redmine attachment by ID.
+
+**Parameters:**
+
+| Parameter      | Type   | Required | Description          |
+| -------------- | ------ | -------- | -------------------- |
+| `attachmentId` | number | Yes      | Attachment record ID |
+
+**Example usage in Claude:**
+
+> "Show me attachment 42"
+
+### attach-file-to-issue
+
+Upload a local file to Redmine and attach it to an issue. Callers must summarize the target issue, file path, filename, description, content type, notes, and private-notes setting in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter      | Type          | Required | Description                                                      |
+| -------------- | ------------- | -------- | ---------------------------------------------------------------- |
+| `issueId`      | string/number | Yes      | Issue ID (e.g., `#12345` or `12345`)                             |
+| `filePath`     | string        | Yes      | Local path to the file to upload                                 |
+| `filename`     | string        | No       | Filename to store in Redmine; defaults to basename of `filePath` |
+| `description`  | string        | No       | Attachment description                                           |
+| `contentType`  | string        | No       | Attachment content type                                          |
+| `notes`        | string        | No       | Optional issue note to add with the upload                       |
+| `privateNotes` | boolean       | No       | Make the issue note private                                      |
+
+**Example usage in Claude:**
+
+> "Attach `/tmp/error.log` to issue #12345 as supporting evidence"
+
+### download-attachment
+
+Download a Redmine attachment's `content_url` to a local path. The tool creates parent directories as needed and refuses to overwrite existing files unless `overwrite` is true.
+
+**Parameters:**
+
+| Parameter         | Type    | Required | Description                                    |
+| ----------------- | ------- | -------- | ---------------------------------------------- |
+| `attachmentId`    | number  | Yes      | Attachment record ID                           |
+| `destinationPath` | string  | Yes      | Local destination path for the downloaded file |
+| `overwrite`       | boolean | No       | Replace `destinationPath` if it already exists |
+
+**Example usage in Claude:**
+
+> "Download attachment 42 to `/tmp/report.txt`"
+
+### update-attachment
+
+Update a Redmine attachment description. Callers must summarize the attachment ID and new description in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter      | Type   | Required | Description                |
+| -------------- | ------ | -------- | -------------------------- |
+| `attachmentId` | number | Yes      | Attachment record ID       |
+| `description`  | string | Yes      | New attachment description |
+
+**Example usage in Claude:**
+
+> "Update attachment 42's description"
+
+### delete-attachment
+
+Delete a Redmine attachment by ID. Callers must summarize the attachment ID and delete action in human-readable form and get explicit user confirmation before using this tool.
+
+**Parameters:**
+
+| Parameter      | Type   | Required | Description          |
+| -------------- | ------ | -------- | -------------------- |
+| `attachmentId` | number | Yes      | Attachment record ID |
+
+**Example usage in Claude:**
+
+> "Delete attachment 42"
 
 ### list-issue-relations
 

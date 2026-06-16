@@ -1,6 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
+import type { Config } from "../config.js";
 import type { RedmineClient } from "../redmine.js";
+import { registerAttachmentTools } from "./attachments.js";
 import { registerCreateIssueTool } from "./create-issue.js";
 import { registerGetIssueTool } from "./get-issue.js";
 import { registerIssueRelationTools } from "./issue-relations.js";
@@ -21,7 +23,9 @@ import { registerWhoamiTool } from "./whoami.js";
 export function registerAllTools(
     server: McpServer,
     redmineClient: RedmineClient,
+    config: Config,
 ): void {
+    registerAttachmentTools(server, redmineClient, config);
     registerCreateIssueTool(server, redmineClient);
     registerGetIssueTool(server, redmineClient);
     registerIssueRelationTools(server, redmineClient);
@@ -41,6 +45,7 @@ export function registerAllTools(
 }
 
 export {
+    registerAttachmentTools,
     registerCreateIssueTool,
     registerGetIssueTool,
     registerIssueRelationTools,

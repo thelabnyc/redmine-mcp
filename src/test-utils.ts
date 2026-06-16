@@ -230,4 +230,6 @@ export function setupTestEnv() {
 export function cleanupTestEnv() {
     delete process.env.REDMINE_URL;
     delete process.env.REDMINE_API_KEY;
+    delete process.env.REDMINE_MCP_FILE_ROOT;
+    delete process.env.REDMINE_MCP_MAX_UPLOAD_BYTES;
 }
