@@ -1,11 +1,5 @@
-import {
-    lstat,
-    mkdir,
-    readFile,
-    realpath,
-    stat,
-    writeFile,
-} from "node:fs/promises";
+import { mkdtemp, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -29,26 +23,24 @@ function isPathWithinRoot(rootPath: string, candidatePath: string): boolean {
     );
 }
 
-function resolvePathWithinRoot(filePath: string, config: Config): string {
-    const resolvedRoot = path.resolve(config.fileRoot);
-    const resolvedPath = path.resolve(filePath);
-
-    if (!isPathWithinRoot(resolvedRoot, resolvedPath)) {
-        throw new Error(`Path is outside configured file root: ${filePath}`);
-    }
-
-    return resolvedPath;
-}
-
 async function resolveUploadFilePath(
     filePath: string,
     config: Config,
 ): Promise<string> {
-    const realRoot = await realpath(config.fileRoot);
+    const [realRoot, realTempRoot] = await Promise.all([
+        realpath(config.fileRoot),
+        realpath(tmpdir()),
+    ]);
     const realFilePath = await realpath(path.resolve(filePath));
 
-    if (!isPathWithinRoot(realRoot, realFilePath)) {
-        throw new Error(`Path is outside configured file root: ${filePath}`);
+    if (
+        ![realRoot, realTempRoot].some((allowedRoot) =>
+            isPathWithinRoot(allowedRoot, realFilePath),
+        )
+    ) {
+        throw new Error(
+            `Path is outside configured file root and OS temp directory: ${filePath}`,
+        );
     }
 
     const fileStat = await stat(realFilePath);
@@ -64,57 +56,29 @@ async function resolveUploadFilePath(
     return realFilePath;
 }
 
-async function rejectSymlinkDestination(
-    safeDestinationPath: string,
-    destinationPath: string,
-): Promise<void> {
-    try {
-        const destinationStat = await lstat(safeDestinationPath);
-        if (destinationStat.isSymbolicLink()) {
-            throw new Error(
-                `Destination is a symbolic link: ${destinationPath}`,
-            );
-        }
-    } catch (error) {
-        if (
-            error instanceof Error &&
-            "code" in error &&
-            (error as NodeJS.ErrnoException).code === "ENOENT"
-        ) {
-            return;
-        }
-        throw error;
+function sanitizeAttachmentFilename(
+    filename: string,
+    attachmentId: number,
+): string {
+    const basename = path.posix.basename(filename.replace(/\\/g, "/"));
+    if (basename === "" || basename === "." || basename === "..") {
+        return `attachment-${attachmentId}`;
     }
+
+    return basename;
 }
 
-async function prepareDownloadDestinationPath(
-    resolvedDestinationPath: string,
-    destinationPath: string,
-    config: Config,
-    overwrite: boolean,
+async function createDownloadDestinationPath(
+    filename: string,
+    attachmentId: number,
 ): Promise<string> {
-    const destinationDir = path.dirname(resolvedDestinationPath);
-    await mkdir(destinationDir, {
-        recursive: true,
-    });
-
-    const realRoot = await realpath(config.fileRoot);
-    const realDestinationDir = await realpath(destinationDir);
-    if (!isPathWithinRoot(realRoot, realDestinationDir)) {
-        throw new Error(
-            `Path is outside configured file root: ${destinationPath}`,
-        );
-    }
-
-    const safeDestinationPath = path.join(
-        realDestinationDir,
-        path.basename(resolvedDestinationPath),
+    const downloadDir = await mkdtemp(
+        path.join(tmpdir(), "redmine-mcp-attachment-"),
     );
-    if (overwrite) {
-        await rejectSymlinkDestination(safeDestinationPath, destinationPath);
-    }
-
-    return safeDestinationPath;
+    return path.join(
+        downloadDir,
+        sanitizeAttachmentFilename(filename, attachmentId),
+    );
 }
 
 export function registerAttachmentTools(
@@ -277,25 +241,13 @@ export function registerAttachmentTools(
         {
             title: "Download Redmine Attachment",
             description:
-                "Fetch Redmine attachment metadata, download its binary content_url, and save it to a local destination path. Creates parent directories as needed and refuses to overwrite existing files unless overwrite is true.",
+                "Fetch Redmine attachment metadata, download its binary content_url, and save it to a generated OS temp directory using the Redmine filename.",
             inputSchema: {
                 attachmentId: attachmentIdSchema,
-                destinationPath: z
-                    .string()
-                    .describe("Local destination path for the downloaded file"),
-                overwrite: z
-                    .boolean()
-                    .optional()
-                    .default(false)
-                    .describe("Replace destinationPath if it already exists"),
             },
         },
-        async ({ attachmentId, destinationPath, overwrite }) => {
+        async ({ attachmentId }) => {
             try {
-                const resolvedDestinationPath = resolvePathWithinRoot(
-                    destinationPath,
-                    config,
-                );
                 const attachment =
                     await redmineClient.getAttachment(attachmentId);
 
@@ -316,37 +268,13 @@ export function registerAttachmentTools(
                         attachmentId,
                         attachment.content_url,
                     );
-                const safeDestinationPath =
-                    await prepareDownloadDestinationPath(
-                        resolvedDestinationPath,
-                        destinationPath,
-                        config,
-                        overwrite,
-                    );
-                try {
-                    await writeFile(
-                        safeDestinationPath,
-                        Buffer.from(arrayBuffer),
-                        { flag: overwrite ? "w" : "wx" },
-                    );
-                } catch (error) {
-                    if (
-                        error instanceof Error &&
-                        "code" in error &&
-                        (error as NodeJS.ErrnoException).code === "EEXIST"
-                    ) {
-                        return {
-                            isError: true,
-                            content: [
-                                {
-                                    type: "text" as const,
-                                    text: `Destination already exists: ${destinationPath}. Pass overwrite: true to replace it.`,
-                                },
-                            ],
-                        };
-                    }
-                    throw error;
-                }
+                const destinationPath = await createDownloadDestinationPath(
+                    attachment.filename,
+                    attachmentId,
+                );
+                await writeFile(destinationPath, Buffer.from(arrayBuffer), {
+                    flag: "wx",
+                });
 
                 return {
                     content: [

@@ -39,12 +39,12 @@ npm run build
 
 The server requires two environment variables:
 
-| Variable                       | Description                                                         | Example                     |
-| ------------------------------ | ------------------------------------------------------------------- | --------------------------- |
-| `REDMINE_URL`                  | Base URL of your Redmine instance                                   | `https://mycompany.plan.io` |
-| `REDMINE_API_KEY`              | Your Redmine API key                                                | `abc123def456...`           |
-| `REDMINE_MCP_FILE_ROOT`        | Directory that attachment upload/download paths must stay within    | `/Users/me/redmine-files`   |
-| `REDMINE_MCP_MAX_UPLOAD_BYTES` | Maximum local file size allowed for `attach-file-to-issue` in bytes | `104857600`                 |
+| Variable                       | Description                                                                             | Example                     |
+| ------------------------------ | --------------------------------------------------------------------------------------- | --------------------------- |
+| `REDMINE_URL`                  | Base URL of your Redmine instance                                                       | `https://mycompany.plan.io` |
+| `REDMINE_API_KEY`              | Your Redmine API key                                                                    | `abc123def456...`           |
+| `REDMINE_MCP_FILE_ROOT`        | Directory that attachment upload paths must stay within; OS temp files are also allowed | `/Users/me/redmine-files`   |
+| `REDMINE_MCP_MAX_UPLOAD_BYTES` | Maximum local file size allowed for `attach-file-to-issue` in bytes                     | `104857600`                 |
 
 ### Getting your Redmine API Key
 
@@ -152,7 +152,7 @@ Fetch metadata for a Redmine attachment by ID.
 
 ### attach-file-to-issue
 
-Upload a local file to Redmine and attach it to an issue. Callers must summarize the target issue, file path, filename, description, content type, notes, and private-notes setting in human-readable form and get explicit user confirmation before using this tool.
+Upload a local file to Redmine and attach it to an issue. The local file must be inside `REDMINE_MCP_FILE_ROOT` or the OS temp directory. Callers must summarize the target issue, file path, filename, description, content type, notes, and private-notes setting in human-readable form and get explicit user confirmation before using this tool.
 
 **Parameters:**
 
@@ -172,19 +172,17 @@ Upload a local file to Redmine and attach it to an issue. Callers must summarize
 
 ### download-attachment
 
-Download a Redmine attachment's `content_url` to a local path. The tool creates parent directories as needed and refuses to overwrite existing files unless `overwrite` is true.
+Download a Redmine attachment's `content_url` to a generated OS temp directory. The tool writes the file using the attachment filename from Redmine and returns the saved path.
 
 **Parameters:**
 
-| Parameter         | Type    | Required | Description                                    |
-| ----------------- | ------- | -------- | ---------------------------------------------- |
-| `attachmentId`    | number  | Yes      | Attachment record ID                           |
-| `destinationPath` | string  | Yes      | Local destination path for the downloaded file |
-| `overwrite`       | boolean | No       | Replace `destinationPath` if it already exists |
+| Parameter      | Type   | Required | Description          |
+| -------------- | ------ | -------- | -------------------- |
+| `attachmentId` | number | Yes      | Attachment record ID |
 
 **Example usage in Claude:**
 
-> "Download attachment 42 to `/tmp/report.txt`"
+> "Download attachment 42"
 
 ### update-attachment
 

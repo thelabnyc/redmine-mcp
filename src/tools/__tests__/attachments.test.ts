@@ -59,9 +59,11 @@ const sampleAttachment: Attachment = {
 
 describe("attachment tools", () => {
     let tempDir: string;
+    let generatedDownloadDirs: string[];
 
     beforeEach(async () => {
         setupTestEnv();
+        generatedDownloadDirs = [];
         tempDir = await mkdtemp(
             path.join(tmpdir(), "redmine-mcp-attachments-"),
         );
@@ -70,6 +72,11 @@ describe("attachment tools", () => {
 
     afterEach(async () => {
         cleanupTestEnv();
+        await Promise.all(
+            generatedDownloadDirs.map((dirPath) =>
+                rm(dirPath, { recursive: true, force: true }),
+            ),
+        );
         await rm(tempDir, { recursive: true, force: true });
     });
 
@@ -133,6 +140,28 @@ describe("attachment tools", () => {
             expect(getTextContent(result)).toContain(
                 "Failed to fetch attachment 404: 404 Not Found - Attachment not found",
             );
+        } finally {
+            await cleanup();
+        }
+    });
+
+    it("advertises download attachment without caller-controlled destination fields", async () => {
+        const { client, cleanup } = await createTestClientServer();
+
+        try {
+            const tools = await client.listTools();
+            const tool = tools.tools.find(
+                (candidate) => candidate.name === "download-attachment",
+            );
+            const schema = tool?.inputSchema as {
+                properties?: Record<string, unknown>;
+                required?: string[];
+            };
+
+            expect(schema.properties).toHaveProperty("attachmentId");
+            expect(schema.properties).not.toHaveProperty("destinationPath");
+            expect(schema.properties).not.toHaveProperty("overwrite");
+            expect(schema.required).toEqual(["attachmentId"]);
         } finally {
             await cleanup();
         }
@@ -241,6 +270,51 @@ describe("attachment tools", () => {
         }
     });
 
+    it("uploads a local file from the OS temp directory outside the configured file root", async () => {
+        const outsideTempDir = await mkdtemp(
+            path.join(tmpdir(), "redmine-mcp-upload-temp-"),
+        );
+        const filePath = path.join(outsideTempDir, "temp-upload.txt");
+        await writeFile(filePath, "temp body", "utf8");
+
+        mockFetch
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 201,
+                json: () =>
+                    Promise.resolve({ upload: { token: "temp-token" } }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 204,
+                json: () => Promise.resolve({}),
+            });
+
+        const { client, cleanup } = await createTestClientServer();
+
+        try {
+            const result = (await client.callTool({
+                name: "attach-file-to-issue",
+                arguments: {
+                    issueId: 12345,
+                    filePath,
+                },
+            })) as ToolResult;
+
+            expect(result.isError).toBeFalsy();
+            const [uploadUrl] = mockFetch.mock.calls[0] as [
+                string,
+                RequestInit,
+            ];
+            expect(uploadUrl).toBe(
+                "https://test.redmine.com/uploads.json?filename=temp-upload.txt",
+            );
+        } finally {
+            await cleanup();
+            await rm(outsideTempDir, { recursive: true, force: true });
+        }
+    });
+
     it("uses the local basename when attaching without a filename", async () => {
         const filePath = path.join(tempDir, "basename.txt");
         await writeFile(filePath, "body", "utf8");
@@ -338,7 +412,7 @@ describe("attachment tools", () => {
 
     it("rejects file uploads outside the configured file root", async () => {
         const outsideDir = await mkdtemp(
-            path.join(tmpdir(), "redmine-mcp-outside-"),
+            path.join(process.cwd(), ".redmine-mcp-outside-"),
         );
         const outsidePath = path.join(outsideDir, "secret.txt");
         await writeFile(outsidePath, "do not upload", "utf8");
@@ -357,7 +431,7 @@ describe("attachment tools", () => {
             expect(mockFetch).not.toHaveBeenCalled();
             expect(result.isError).toBe(true);
             expect(getTextContent(result)).toContain(
-                `Path is outside configured file root: ${outsidePath}`,
+                `Path is outside configured file root and OS temp directory: ${outsidePath}`,
             );
         } finally {
             await cleanup();
@@ -440,9 +514,8 @@ describe("attachment tools", () => {
         }
     });
 
-    it("downloads an attachment content URL to a destination path", async () => {
+    it("downloads an attachment content URL to a generated temp path with the Redmine filename", async () => {
         const downloadedBytes = Uint8Array.from([0, 1, 2, 255]);
-        const destinationPath = path.join(tempDir, "nested", "download.bin");
 
         mockFetch
             .mockResolvedValueOnce({
@@ -466,7 +539,6 @@ describe("attachment tools", () => {
                 name: "download-attachment",
                 arguments: {
                     attachmentId: 42,
-                    destinationPath,
                 },
             })) as ToolResult;
 
@@ -483,142 +555,32 @@ describe("attachment tools", () => {
                 ],
             ).toBe("test-api-key");
 
-            await expect(readFile(destinationPath)).resolves.toEqual(
-                Buffer.from(downloadedBytes),
-            );
             expect(result.isError).toBeFalsy();
             const data = parseJsonResult<{
                 attachment: Attachment;
                 saved_path: string;
             }>(result);
+            generatedDownloadDirs.push(path.dirname(data.saved_path));
             expect(data.attachment.id).toBe(42);
-            expect(data.saved_path).toBe(destinationPath);
-        } finally {
-            await cleanup();
-        }
-    });
-
-    it("refuses to overwrite an existing destination by default", async () => {
-        const destinationPath = path.join(tempDir, "existing.txt");
-        await writeFile(destinationPath, "existing", "utf8");
-        const downloadedBytes = Uint8Array.from([1, 2, 3]);
-
-        mockFetch
-            .mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: () =>
-                    Promise.resolve({
-                        attachment: sampleAttachment,
-                    } satisfies AttachmentResponse),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                arrayBuffer: () => Promise.resolve(downloadedBytes.buffer),
-            });
-
-        const { client, cleanup } = await createTestClientServer();
-
-        try {
-            const result = (await client.callTool({
-                name: "download-attachment",
-                arguments: {
-                    attachmentId: 42,
-                    destinationPath,
-                },
-            })) as ToolResult;
-
-            expect(mockFetch).toHaveBeenCalledTimes(2);
-            expect(result.isError).toBe(true);
-            expect(getTextContent(result)).toContain(
-                `Destination already exists: ${destinationPath}. Pass overwrite: true to replace it.`,
+            expect(path.basename(data.saved_path)).toBe(
+                sampleAttachment.filename,
             );
-            await expect(readFile(destinationPath, "utf8")).resolves.toBe(
-                "existing",
+            expect(path.dirname(data.saved_path)).toContain(
+                path.join(tmpdir(), "redmine-mcp-attachment-"),
+            );
+            await expect(readFile(data.saved_path)).resolves.toEqual(
+                Buffer.from(downloadedBytes),
             );
         } finally {
             await cleanup();
         }
     });
 
-    it("rejects download destinations outside the configured file root", async () => {
-        const outsideDir = await mkdtemp(
-            path.join(tmpdir(), "redmine-mcp-download-outside-"),
-        );
-        const destinationPath = path.join(outsideDir, "download.bin");
-
-        const { client, cleanup } = await createTestClientServer();
-
-        try {
-            const result = (await client.callTool({
-                name: "download-attachment",
-                arguments: {
-                    attachmentId: 42,
-                    destinationPath,
-                },
-            })) as ToolResult;
-
-            expect(mockFetch).not.toHaveBeenCalled();
-            expect(result.isError).toBe(true);
-            expect(getTextContent(result)).toContain(
-                `Path is outside configured file root: ${destinationPath}`,
-            );
-        } finally {
-            await cleanup();
-            await rm(outsideDir, { recursive: true, force: true });
-        }
-    });
-
-    it("handles a destination created between download and exclusive write", async () => {
-        const destinationPath = path.join(tempDir, "race.txt");
-        const downloadedBytes = Uint8Array.from([4, 5, 6]);
-
-        mockFetch
-            .mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                json: () =>
-                    Promise.resolve({
-                        attachment: sampleAttachment,
-                    } satisfies AttachmentResponse),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                status: 200,
-                arrayBuffer: async () => {
-                    await writeFile(destinationPath, "existing", "utf8");
-                    return downloadedBytes.buffer;
-                },
-            });
-
-        const { client, cleanup } = await createTestClientServer();
-
-        try {
-            const result = (await client.callTool({
-                name: "download-attachment",
-                arguments: {
-                    attachmentId: 42,
-                    destinationPath,
-                },
-            })) as ToolResult;
-
-            expect(mockFetch).toHaveBeenCalledTimes(2);
-            expect(result.isError).toBe(true);
-            expect(getTextContent(result)).toContain(
-                `Destination already exists: ${destinationPath}. Pass overwrite: true to replace it.`,
-            );
-            await expect(readFile(destinationPath, "utf8")).resolves.toBe(
-                "existing",
-            );
-        } finally {
-            await cleanup();
-        }
-    });
-
-    it("allows overwriting an existing destination when requested", async () => {
-        const destinationPath = path.join(tempDir, "existing.txt");
-        await writeFile(destinationPath, "existing", "utf8");
+    it("sanitizes Redmine filenames before writing to the generated temp directory", async () => {
+        const unsafeFilenameAttachment: Attachment = {
+            ...sampleAttachment,
+            filename: "../report.pdf",
+        };
         const downloadedBytes = Uint8Array.from([9, 8, 7]);
 
         mockFetch
@@ -627,7 +589,7 @@ describe("attachment tools", () => {
                 status: 200,
                 json: () =>
                     Promise.resolve({
-                        attachment: sampleAttachment,
+                        attachment: unsafeFilenameAttachment,
                     } satisfies AttachmentResponse),
             })
             .mockResolvedValueOnce({
@@ -643,13 +605,19 @@ describe("attachment tools", () => {
                 name: "download-attachment",
                 arguments: {
                     attachmentId: 42,
-                    destinationPath,
-                    overwrite: true,
                 },
             })) as ToolResult;
 
             expect(result.isError).toBeFalsy();
-            await expect(readFile(destinationPath)).resolves.toEqual(
+            const data = parseJsonResult<{
+                saved_path: string;
+            }>(result);
+            generatedDownloadDirs.push(path.dirname(data.saved_path));
+            expect(path.basename(data.saved_path)).toBe("report.pdf");
+            expect(path.dirname(data.saved_path)).toContain(
+                path.join(tmpdir(), "redmine-mcp-attachment-"),
+            );
+            await expect(readFile(data.saved_path)).resolves.toEqual(
                 Buffer.from(downloadedBytes),
             );
         } finally {
@@ -662,7 +630,6 @@ describe("attachment tools", () => {
             ...sampleAttachment,
             content_url: "https://cdn.example.test/files/report.txt",
         };
-        const destinationPath = path.join(tempDir, "external.txt");
         const downloadedBytes = Uint8Array.from([7, 8, 9]);
 
         mockFetch
@@ -687,11 +654,14 @@ describe("attachment tools", () => {
                 name: "download-attachment",
                 arguments: {
                     attachmentId: 42,
-                    destinationPath,
                 },
             })) as ToolResult;
 
             expect(result.isError).toBeFalsy();
+            const data = parseJsonResult<{
+                saved_path: string;
+            }>(result);
+            generatedDownloadDirs.push(path.dirname(data.saved_path));
             const [downloadUrl, downloadOptions] = mockFetch.mock.calls[1] as [
                 string,
                 RequestInit,
@@ -700,7 +670,7 @@ describe("attachment tools", () => {
             expect(downloadOptions.headers).toEqual({
                 Accept: "application/octet-stream",
             });
-            await expect(readFile(destinationPath)).resolves.toEqual(
+            await expect(readFile(data.saved_path)).resolves.toEqual(
                 Buffer.from(downloadedBytes),
             );
         } finally {
@@ -709,8 +679,6 @@ describe("attachment tools", () => {
     });
 
     it("rejects cross-origin redirects while keeping attachment credentials scoped", async () => {
-        const destinationPath = path.join(tempDir, "redirect.txt");
-
         mockFetch
             .mockResolvedValueOnce({
                 ok: true,
@@ -740,7 +708,6 @@ describe("attachment tools", () => {
                 name: "download-attachment",
                 arguments: {
                     attachmentId: 42,
-                    destinationPath,
                 },
             })) as ToolResult;
 
@@ -769,7 +736,6 @@ describe("attachment tools", () => {
             ...sampleAttachment,
             content_url: "http://169.254.169.254/latest/meta-data/",
         };
-        const destinationPath = path.join(tempDir, "metadata.txt");
 
         mockFetch.mockResolvedValueOnce({
             ok: true,
@@ -787,7 +753,6 @@ describe("attachment tools", () => {
                 name: "download-attachment",
                 arguments: {
                     attachmentId: 42,
-                    destinationPath,
                 },
             })) as ToolResult;
 
@@ -806,7 +771,6 @@ describe("attachment tools", () => {
             ...sampleAttachment,
             content_url: "file:///etc/passwd",
         };
-        const destinationPath = path.join(tempDir, "passwd.txt");
 
         mockFetch.mockResolvedValueOnce({
             ok: true,
@@ -824,7 +788,6 @@ describe("attachment tools", () => {
                 name: "download-attachment",
                 arguments: {
                     attachmentId: 42,
-                    destinationPath,
                 },
             })) as ToolResult;
 
@@ -858,7 +821,6 @@ describe("attachment tools", () => {
                 name: "download-attachment",
                 arguments: {
                     attachmentId: 42,
-                    destinationPath: path.join(tempDir, "download.bin"),
                 },
             })) as ToolResult;
 
@@ -896,7 +858,6 @@ describe("attachment tools", () => {
                 name: "download-attachment",
                 arguments: {
                     attachmentId: 42,
-                    destinationPath: path.join(tempDir, "download.bin"),
                 },
             })) as ToolResult;
 
