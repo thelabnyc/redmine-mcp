@@ -1,3 +1,25 @@
+## v0.5.0 (2026-06-16)
+
+### Feat
+
+- add Redmine global search
+- add Redmine watcher tools
+- add Redmine time entry tools
+- add Redmine attachment tools
+- add Redmine versions and categories support
+- add general Redmine issue listing
+- add saved Redmine query listing
+- add issue relation tools
+- add codex plugin support
+
+### Fix
+
+- **deps**: update dependency zod to v4
+
+### Refactor
+
+- tweak file downloads
+
 ## v0.4.0 (2026-02-17)
 
 ### Feat
