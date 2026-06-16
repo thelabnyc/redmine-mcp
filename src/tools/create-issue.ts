@@ -12,7 +12,7 @@ export function registerCreateIssueTool(
         {
             title: "Create Redmine Issue",
             description:
-                "Create a new Redmine issue. Requires projectId and subject. Use list-trackers, list-issue-priorities, list-issue-statuses, and list-project-custom-fields to discover valid field values first. IMPORTANT: Before calling this tool, you MUST present the user with a summary of all the issue fields you plan to set and get their explicit confirmation before proceeding. Use human-readable labels (e.g. 'Priority: High', 'Tracker: Bug') in the summary, not raw numeric IDs.",
+                "Create a new Redmine issue. Requires projectId and subject. Use list-trackers, list-issue-priorities, list-issue-statuses, list-project-versions, list-project-issue-categories, and list-project-custom-fields to discover valid field values first. IMPORTANT: Before calling this tool, you MUST present the user with a summary of all the issue fields you plan to set and get their explicit confirmation before proceeding. Use human-readable labels (e.g. 'Priority: High', 'Tracker: Bug') in the summary, not raw numeric IDs.",
             inputSchema: {
                 projectId: z
                     .union([z.string(), z.number()])
@@ -36,6 +36,14 @@ export function registerCreateIssueTool(
                     .number()
                     .optional()
                     .describe("Parent issue ID"),
+                fixedVersionId: z
+                    .number()
+                    .optional()
+                    .describe("Fixed version ID to set"),
+                categoryId: z
+                    .number()
+                    .optional()
+                    .describe("Issue category ID to set"),
                 startDate: z
                     .string()
                     .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
@@ -86,6 +94,8 @@ export function registerCreateIssueTool(
             assignedToId,
             trackerId,
             parentIssueId,
+            fixedVersionId,
+            categoryId,
             startDate,
             dueDate,
             doneRatio,
@@ -108,6 +118,10 @@ export function registerCreateIssueTool(
                 if (trackerId !== undefined) createData.tracker_id = trackerId;
                 if (parentIssueId !== undefined)
                     createData.parent_issue_id = parentIssueId;
+                if (fixedVersionId !== undefined)
+                    createData.fixed_version_id = fixedVersionId;
+                if (categoryId !== undefined)
+                    createData.category_id = categoryId;
                 if (startDate !== undefined) createData.start_date = startDate;
                 if (dueDate !== undefined) createData.due_date = dueDate;
                 if (doneRatio !== undefined) createData.done_ratio = doneRatio;

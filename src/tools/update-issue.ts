@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as z from "zod";
 
-import type { RedmineClient } from "../redmine.js";
+import type { RedmineClient, UpdateIssueData } from "../redmine.js";
 import { parseIssueId } from "./utils.js";
 
 export function registerUpdateIssueTool(
@@ -13,7 +13,7 @@ export function registerUpdateIssueTool(
         {
             title: "Update Redmine Issue",
             description:
-                "Update a Redmine issue. Can update fields like status, assignee, add notes, and optionally log time spent. All parameters except issueId are optional.",
+                "Update a Redmine issue. Can update fields like status, assignee, fixed version, category, add notes, and optionally log time spent. All parameters except issueId are optional. Use list-trackers, list-issue-priorities, list-issue-statuses, list-project-versions, list-project-issue-categories, and list-project-custom-fields to discover valid field values first. IMPORTANT: Before calling this tool, you MUST present the user with a summary of all issue fields you plan to change and get their explicit confirmation before proceeding. Use human-readable labels (e.g. 'Status: In Progress', 'Fixed version: 1.0.0') in the summary, not raw numeric IDs.",
             inputSchema: {
                 issueId: z
                     .string()
@@ -41,6 +41,14 @@ export function registerUpdateIssueTool(
                     .number()
                     .optional()
                     .describe("Parent issue ID"),
+                fixedVersionId: z
+                    .number()
+                    .optional()
+                    .describe("Fixed version ID to set"),
+                categoryId: z
+                    .number()
+                    .optional()
+                    .describe("Issue category ID to set"),
                 startDate: z
                     .string()
                     .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD format")
@@ -117,6 +125,8 @@ export function registerUpdateIssueTool(
             assignedToId,
             trackerId,
             parentIssueId,
+            fixedVersionId,
+            categoryId,
             startDate,
             dueDate,
             doneRatio,
@@ -145,7 +155,7 @@ export function registerUpdateIssueTool(
                 const numericId = parsed.numericId;
 
                 // Build update data (convert camelCase to snake_case)
-                const updateData: Record<string, unknown> = {};
+                const updateData: UpdateIssueData = {};
                 if (subject !== undefined) updateData.subject = subject;
                 if (description !== undefined)
                     updateData.description = description;
@@ -157,6 +167,10 @@ export function registerUpdateIssueTool(
                 if (trackerId !== undefined) updateData.tracker_id = trackerId;
                 if (parentIssueId !== undefined)
                     updateData.parent_issue_id = parentIssueId;
+                if (fixedVersionId !== undefined)
+                    updateData.fixed_version_id = fixedVersionId;
+                if (categoryId !== undefined)
+                    updateData.category_id = categoryId;
                 if (startDate !== undefined) updateData.start_date = startDate;
                 if (dueDate !== undefined) updateData.due_date = dueDate;
                 if (doneRatio !== undefined) updateData.done_ratio = doneRatio;

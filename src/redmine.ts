@@ -1,5 +1,9 @@
 import type { Config } from "./config.js";
 
+function encodePathSegment(value: string | number): string {
+    return encodeURIComponent(String(value));
+}
+
 export interface RedmineUser {
     id: number;
     name: string;
@@ -29,6 +33,28 @@ export interface RedmineCurrentUser {
 export interface RedmineProject {
     id: number;
     name: string;
+}
+
+export interface RedmineVersion {
+    id: number;
+    project: RedmineProject;
+    name: string;
+    description?: string;
+    status: string;
+    due_date?: string;
+    sharing: string;
+    created_on: string;
+    updated_on: string;
+    wiki_page_title?: string;
+    estimated_hours?: number;
+    spent_hours?: number;
+}
+
+export interface RedmineIssueCategory {
+    id: number;
+    project: RedmineProject;
+    name: string;
+    assigned_to?: RedmineUser;
 }
 
 export interface RedmineTracker {
@@ -189,6 +215,8 @@ export interface UpdateIssueData {
     assigned_to_id?: number; // Set to 0 to unassign
     tracker_id?: number;
     parent_issue_id?: number;
+    fixed_version_id?: number;
+    category_id?: number;
     start_date?: string; // YYYY-MM-DD
     due_date?: string; // YYYY-MM-DD
     done_ratio?: number; // 0-100
@@ -208,6 +236,8 @@ export interface CreateIssueData {
     assigned_to_id?: number;
     tracker_id?: number;
     parent_issue_id?: number;
+    fixed_version_id?: number;
+    category_id?: number;
     start_date?: string;
     due_date?: string;
     done_ratio?: number;
@@ -265,6 +295,16 @@ export interface ListProjectMembersOptions {
     offset?: number;
 }
 
+export interface ListProjectVersionsResult {
+    versions: RedmineVersion[];
+    total_count: number;
+}
+
+export interface ListProjectIssueCategoriesResult {
+    issue_categories: RedmineIssueCategory[];
+    total_count: number;
+}
+
 // Internal response types
 interface RedmineIssueResponse {
     issue: RedmineIssue;
@@ -291,6 +331,16 @@ interface RedmineMembershipsResponse {
     total_count: number;
     offset: number;
     limit: number;
+}
+
+interface RedmineVersionsResponse {
+    versions: RedmineVersion[];
+    total_count?: number;
+}
+
+interface RedmineIssueCategoriesResponse {
+    issue_categories: RedmineIssueCategory[];
+    total_count?: number;
 }
 
 interface RedmineIssueStatusesResponse {
@@ -704,6 +754,62 @@ export class RedmineClient {
             total_count: data.total_count,
             offset: data.offset,
             limit: data.limit,
+        };
+    }
+
+    async listProjectVersions(
+        projectId: string | number,
+    ): Promise<ListProjectVersionsResult> {
+        const encodedProjectId = encodePathSegment(projectId);
+        const url = `${this.config.redmineUrl}/projects/${encodedProjectId}/versions.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch project versions: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineVersionsResponse;
+        return {
+            versions: data.versions,
+            total_count: data.total_count ?? data.versions.length,
+        };
+    }
+
+    async listProjectIssueCategories(
+        projectId: string | number,
+    ): Promise<ListProjectIssueCategoriesResult> {
+        const encodedProjectId = encodePathSegment(projectId);
+        const url = `${this.config.redmineUrl}/projects/${encodedProjectId}/issue_categories.json`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch project issue categories: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineIssueCategoriesResponse;
+        return {
+            issue_categories: data.issue_categories,
+            total_count: data.total_count ?? data.issue_categories.length,
         };
     }
 

@@ -298,6 +298,46 @@ describe("create-issue tool", () => {
         }
     });
 
+    it("creates issue with fixed version and category", async () => {
+        mockFetch
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 201,
+                json: () => Promise.resolve(sampleCreatedIssueResponse),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve(sampleGetIssueResponse),
+            });
+
+        const { client, cleanup } = await createTestClientServer();
+
+        try {
+            await client.callTool({
+                name: "create-issue",
+                arguments: {
+                    projectId: "test-project",
+                    subject: "Issue with release metadata",
+                    fixedVersionId: 7,
+                    categoryId: 3,
+                },
+            });
+
+            const [, postOptions] = mockFetch.mock.calls[0] as [
+                string,
+                RequestInit,
+            ];
+            const body = JSON.parse(
+                postOptions.body as string,
+            ) as CreateIssueRequestBody;
+            expect(body.issue.fixed_version_id).toBe(7);
+            expect(body.issue.category_id).toBe(3);
+        } finally {
+            await cleanup();
+        }
+    });
+
     it("handles network error", async () => {
         mockFetch.mockRejectedValueOnce(new Error("Network error"));
 

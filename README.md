@@ -4,7 +4,7 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 
 ## Features
 
-- **Create issues** with full field support including custom fields
+- **Create issues** with full field support including fixed versions, categories, and custom fields
 - **Fetch issue details** by ID, including subject, description, status, priority, and assignee
 - **Update issues**: change status, assign users, add notes, set custom fields, and more
 - **Log time** spent on issues with integrated time tracking
@@ -14,7 +14,7 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 - **List saved queries** visible to the current user
 - **List project members** to find user IDs for assignments
 - **Manage issue relations**: list, fetch, create, and delete Redmine relation records
-- **Discover metadata**: list available statuses, trackers, priorities, and custom fields
+- **Discover metadata**: list available statuses, trackers, priorities, versions, categories, and custom fields
 - **Retrieve change history** (journals) with every request
 - Optionally include attachments, watchers, relations, and child issues
 
@@ -209,6 +209,8 @@ Create a new Redmine issue.
 | `assignedToId`   | number        | No       | User ID to assign                                         |
 | `trackerId`      | number        | No       | Tracker ID to set                                         |
 | `parentIssueId`  | number        | No       | Parent issue ID                                           |
+| `fixedVersionId` | number        | No       | Fixed version ID to set                                   |
+| `categoryId`     | number        | No       | Issue category ID to set                                  |
 | `startDate`      | string        | No       | Start date (YYYY-MM-DD format)                            |
 | `dueDate`        | string        | No       | Due date (YYYY-MM-DD format)                              |
 | `doneRatio`      | number        | No       | Percent done (0-100)                                      |
@@ -236,6 +238,8 @@ Update a Redmine issue. Can change fields, add notes, and log time spent.
 | `assignedToId`   | number  | No       | User ID to assign (use 0 to unassign)                     |
 | `trackerId`      | number  | No       | Tracker ID to set                                         |
 | `parentIssueId`  | number  | No       | Parent issue ID                                           |
+| `fixedVersionId` | number  | No       | Fixed version ID to set                                   |
+| `categoryId`     | number  | No       | Issue category ID to set                                  |
 | `startDate`      | string  | No       | Start date (YYYY-MM-DD format)                            |
 | `dueDate`        | string  | No       | Due date (YYYY-MM-DD format)                              |
 | `doneRatio`      | number  | No       | Percent done (0-100)                                      |
@@ -345,6 +349,34 @@ List all members of a Redmine project. Use this to find user IDs for assigning i
 **Example usage in Claude:**
 
 > "Who can I assign issues to in project 'my-project'?"
+
+### list-project-versions
+
+List versions for a Redmine project. Use this to discover fixed version IDs before setting `fixedVersionId` on `create-issue` or `update-issue`.
+
+**Parameters:**
+
+| Parameter   | Type          | Required | Description                                    |
+| ----------- | ------------- | -------- | ---------------------------------------------- |
+| `projectId` | string/number | Yes      | Project identifier (string slug or numeric ID) |
+
+**Example usage in Claude:**
+
+> "What versions are available for project 'my-app'?"
+
+### list-project-issue-categories
+
+List issue categories for a Redmine project. Use this to discover category IDs before setting `categoryId` on `create-issue` or `update-issue`.
+
+**Parameters:**
+
+| Parameter   | Type          | Required | Description                                    |
+| ----------- | ------------- | -------- | ---------------------------------------------- |
+| `projectId` | string/number | Yes      | Project identifier (string slug or numeric ID) |
+
+**Example usage in Claude:**
+
+> "What issue categories are available for project 'my-app'?"
 
 ### list-issue-statuses
 

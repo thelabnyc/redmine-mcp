@@ -42,6 +42,8 @@ export interface IssueRequestBody {
         assigned_to_id?: number;
         tracker_id?: number;
         parent_issue_id?: number;
+        fixed_version_id?: number;
+        category_id?: number;
         start_date?: string;
         due_date?: string;
         done_ratio?: number;
@@ -62,6 +64,8 @@ export interface CreateIssueRequestBody {
         assigned_to_id?: number;
         tracker_id?: number;
         parent_issue_id?: number;
+        fixed_version_id?: number;
+        category_id?: number;
         start_date?: string;
         due_date?: string;
         done_ratio?: number;
