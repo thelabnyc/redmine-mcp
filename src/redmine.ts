@@ -36,6 +36,13 @@ export interface RedmineTracker {
     name: string;
 }
 
+export interface RedmineQuery {
+    id: number;
+    name: string;
+    is_public: boolean;
+    project_id?: number;
+}
+
 export interface RedmineStatus {
     id: number;
     name: string;
@@ -340,6 +347,13 @@ interface RedmineProjectsListResponse {
     limit: number;
 }
 
+interface RedmineQueriesListResponse {
+    queries: RedmineQuery[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
 export interface ListMyIssuesOptions {
     statusId?: number | "open" | "closed" | "*";
     projectId?: string | number;
@@ -369,6 +383,11 @@ export interface RedmineProjectSummary {
 }
 
 export interface ListProjectsOptions {
+    limit?: number;
+    offset?: number;
+}
+
+export interface ListQueriesOptions {
     limit?: number;
     offset?: number;
 }
@@ -913,6 +932,49 @@ export class RedmineClient {
 
         return {
             projects: summaries,
+            total_count: data.total_count,
+            offset: data.offset,
+            limit: data.limit,
+        };
+    }
+
+    async listQueries(options: ListQueriesOptions = {}): Promise<{
+        queries: RedmineQuery[];
+        total_count: number;
+        offset: number;
+        limit: number;
+    }> {
+        const params = new URLSearchParams();
+
+        if (options.limit !== undefined) {
+            params.set("limit", String(options.limit));
+        }
+        if (options.offset !== undefined) {
+            params.set("offset", String(options.offset));
+        }
+
+        const queryString = params.toString();
+        const url = `${this.config.redmineUrl}/queries.json${queryString ? `?${queryString}` : ""}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch queries: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineQueriesListResponse;
+
+        return {
+            queries: data.queries,
             total_count: data.total_count,
             offset: data.offset,
             limit: data.limit,

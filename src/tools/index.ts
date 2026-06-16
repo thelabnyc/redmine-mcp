@@ -10,6 +10,7 @@ import { registerListMyIssuesTool } from "./list-my-issues.js";
 import { registerListProjectCustomFieldsTool } from "./list-project-custom-fields.js";
 import { registerListProjectMembersTool } from "./list-project-members.js";
 import { registerListProjectsTool } from "./list-projects.js";
+import { registerListQueriesTool } from "./list-queries.js";
 import { registerListTrackersTool } from "./list-trackers.js";
 import { registerUpdateIssueTool } from "./update-issue.js";
 import { registerWhoamiTool } from "./whoami.js";
@@ -27,6 +28,7 @@ export function registerAllTools(
     registerListProjectCustomFieldsTool(server, redmineClient);
     registerListProjectMembersTool(server, redmineClient);
     registerListProjectsTool(server, redmineClient);
+    registerListQueriesTool(server, redmineClient);
     registerListTrackersTool(server, redmineClient);
     registerUpdateIssueTool(server, redmineClient);
     registerWhoamiTool(server, redmineClient);
@@ -42,6 +44,7 @@ export {
     registerListProjectCustomFieldsTool,
     registerListProjectMembersTool,
     registerListProjectsTool,
+    registerListQueriesTool,
     registerListTrackersTool,
     registerUpdateIssueTool,
     registerWhoamiTool,

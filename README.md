@@ -10,6 +10,7 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 - **Log time** spent on issues with integrated time tracking
 - **List issues** assigned to the current user, with filtering and sorting
 - **List projects** accessible to the current user
+- **List saved queries** visible to the current user
 - **List project members** to find user IDs for assignments
 - **Manage issue relations**: list, fetch, create, and delete Redmine relation records
 - **Discover metadata**: list available statuses, trackers, priorities, and custom fields
@@ -284,6 +285,21 @@ List all projects accessible to the current user.
 **Example usage in Claude:**
 
 > "What Redmine projects do I have access to?"
+
+### list-queries
+
+List saved Redmine issue queries visible to the current user.
+
+**Parameters:**
+
+| Parameter | Type   | Required | Description                              |
+| --------- | ------ | -------- | ---------------------------------------- |
+| `limit`   | number | No       | Maximum results to return                |
+| `offset`  | number | No       | Number of results to skip for pagination |
+
+**Example usage in Claude:**
+
+> "What saved Redmine queries can I use?"
 
 ### list-project-members
 
