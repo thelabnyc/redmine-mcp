@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RedmineClient } from "../redmine.js";
 import { registerCreateIssueTool } from "./create-issue.js";
 import { registerGetIssueTool } from "./get-issue.js";
+import { registerIssueRelationTools } from "./issue-relations.js";
 import { registerListIssuePrioritiesTool } from "./list-issue-priorities.js";
 import { registerListIssueStatusesTool } from "./list-issue-statuses.js";
 import { registerListMyIssuesTool } from "./list-my-issues.js";
@@ -19,6 +20,7 @@ export function registerAllTools(
 ): void {
     registerCreateIssueTool(server, redmineClient);
     registerGetIssueTool(server, redmineClient);
+    registerIssueRelationTools(server, redmineClient);
     registerListIssuePrioritiesTool(server, redmineClient);
     registerListIssueStatusesTool(server, redmineClient);
     registerListMyIssuesTool(server, redmineClient);
@@ -33,6 +35,7 @@ export function registerAllTools(
 export {
     registerCreateIssueTool,
     registerGetIssueTool,
+    registerIssueRelationTools,
     registerListIssuePrioritiesTool,
     registerListIssueStatusesTool,
     registerListMyIssuesTool,

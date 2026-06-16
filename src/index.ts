@@ -14,6 +14,7 @@ export type {
     GetIssueOptions,
     UpdateIssueData,
     CreateIssueData,
+    CreateIssueRelationData,
     CreateTimeEntryData,
     RedmineTimeEntry,
     RedmineActivity,
@@ -28,4 +29,5 @@ export type {
     RedmineJournalDetail,
     RedmineWatcher,
     RedmineRelation,
+    RedmineRelationType,
 } from "./redmine.js";

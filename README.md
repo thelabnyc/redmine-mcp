@@ -11,6 +11,7 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 - **List issues** assigned to the current user, with filtering and sorting
 - **List projects** accessible to the current user
 - **List project members** to find user IDs for assignments
+- **Manage issue relations**: list, fetch, create, and delete Redmine relation records
 - **Discover metadata**: list available statuses, trackers, priorities, and custom fields
 - **Retrieve change history** (journals) with every request
 - Optionally include attachments, watchers, relations, and child issues
@@ -128,6 +129,67 @@ Fetch details about a Redmine issue by ID.
 **Example usage in Claude:**
 
 > "Look up Redmine issue #12345 and summarize the recent activity"
+
+### list-issue-relations
+
+List relation records for a Redmine issue. This exposes Redmine's `GET /issues/:issue_id/relations.json` endpoint.
+
+**Parameters:**
+
+| Parameter | Type   | Required | Description                                 |
+| --------- | ------ | -------- | ------------------------------------------- |
+| `issueId` | string | Yes      | Source issue ID (e.g., `#12345` or `12345`) |
+
+**Example usage in Claude:**
+
+> "List the related tickets for issue #12345"
+
+### get-issue-relation
+
+Fetch one Redmine issue relation record by relation ID.
+
+**Parameters:**
+
+| Parameter    | Type   | Required | Description        |
+| ------------ | ------ | -------- | ------------------ |
+| `relationId` | number | Yes      | Relation record ID |
+
+**Example usage in Claude:**
+
+> "Show me relation 1819"
+
+### create-issue-relation
+
+Create a Redmine issue relation. This exposes Redmine's `POST /issues/:issue_id/relations.json` endpoint. The `issueId` parameter is the source/from issue, and `issueToId` is the target/to issue.
+
+**Parameters:**
+
+| Parameter      | Type   | Required | Description                                         |
+| -------------- | ------ | -------- | --------------------------------------------------- |
+| `issueId`      | string | Yes      | Source/from issue ID (e.g., `#12345` or `12345`)    |
+| `issueToId`    | number | Yes      | Target/to related issue ID                          |
+| `relationType` | string | No       | Relation type; defaults to `relates`                |
+| `delay`        | number | No       | Delay in days for `precedes` or `follows` relations |
+
+Supported relation types are `relates`, `duplicates`, `duplicated`, `blocks`, `blocked`, `precedes`, `follows`, `copied_to`, and `copied_from`.
+
+**Example usage in Claude:**
+
+> "Relate issue #12345 to issue #67890"
+
+### delete-issue-relation
+
+Delete a Redmine issue relation record by relation ID. Redmine does not provide an update endpoint for relation records; callers that need to change a relation should delete the old relation and create the desired new relation explicitly.
+
+**Parameters:**
+
+| Parameter    | Type   | Required | Description                  |
+| ------------ | ------ | -------- | ---------------------------- |
+| `relationId` | number | Yes      | Relation record ID to delete |
+
+**Example usage in Claude:**
+
+> "Delete relation 1819"
 
 ### create-issue
 
