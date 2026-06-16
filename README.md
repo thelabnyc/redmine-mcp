@@ -8,6 +8,7 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 - **Fetch issue details** by ID, including subject, description, status, priority, and assignee
 - **Update issues**: change status, assign users, add notes, set custom fields, and more
 - **Log time** spent on issues with integrated time tracking
+- **List issues** with general Redmine filters, saved queries, and optional includes
 - **List issues** assigned to the current user, with filtering and sorting
 - **List projects** accessible to the current user
 - **List saved queries** visible to the current user
@@ -270,6 +271,34 @@ List issues assigned to the current user, with optional filtering and sorting.
 **Example usage in Claude:**
 
 > "What issues are assigned to me?"
+
+### list-issues
+
+List Redmine issues using general issue filters. This calls Redmine `GET /issues.json` and returns full issue objects plus `total_count`, `offset`, and `limit` metadata. Use `list-queries` to discover saved query IDs for the `queryId` parameter.
+
+**Parameters:**
+
+| Parameter            | Type          | Required | Description                                         |
+| -------------------- | ------------- | -------- | --------------------------------------------------- |
+| `issueIds`           | array         | No       | Issue IDs; strings may include `#` prefixes         |
+| `projectId`          | string/number | No       | Filter by project ID or identifier                  |
+| `trackerId`          | number        | No       | Filter by tracker ID                                |
+| `statusId`           | number/string | No       | Filter by status ID, or `"open"`, `"closed"`, `"*"` |
+| `assignedToId`       | number/string | No       | Filter by assignee user ID, or `"me"`               |
+| `parentId`           | number        | No       | Filter by parent issue ID                           |
+| `createdOn`          | string        | No       | Redmine `created_on` filter expression              |
+| `updatedOn`          | string        | No       | Redmine `updated_on` filter expression              |
+| `customFields`       | array         | No       | Custom field filters, serialized as `cf_<id>=value` |
+| `queryId`            | number        | No       | Saved query ID; use `list-queries` to discover IDs  |
+| `includeAttachments` | boolean       | No       | Include issue attachments                           |
+| `includeRelations`   | boolean       | No       | Include issue relations                             |
+| `sort`               | string        | No       | Sort order, e.g. `updated_on:desc`                  |
+| `limit`              | number        | No       | Maximum results to return                           |
+| `offset`             | number        | No       | Number of results to skip for pagination            |
+
+**Example usage in Claude:**
+
+> "List open bugs in project 'my-app' updated this month"
 
 ### list-projects
 

@@ -6,6 +6,7 @@ import { registerGetIssueTool } from "./get-issue.js";
 import { registerIssueRelationTools } from "./issue-relations.js";
 import { registerListIssuePrioritiesTool } from "./list-issue-priorities.js";
 import { registerListIssueStatusesTool } from "./list-issue-statuses.js";
+import { registerListIssuesTool } from "./list-issues.js";
 import { registerListMyIssuesTool } from "./list-my-issues.js";
 import { registerListProjectCustomFieldsTool } from "./list-project-custom-fields.js";
 import { registerListProjectMembersTool } from "./list-project-members.js";
@@ -24,6 +25,7 @@ export function registerAllTools(
     registerIssueRelationTools(server, redmineClient);
     registerListIssuePrioritiesTool(server, redmineClient);
     registerListIssueStatusesTool(server, redmineClient);
+    registerListIssuesTool(server, redmineClient);
     registerListMyIssuesTool(server, redmineClient);
     registerListProjectCustomFieldsTool(server, redmineClient);
     registerListProjectMembersTool(server, redmineClient);
@@ -40,6 +42,7 @@ export {
     registerIssueRelationTools,
     registerListIssuePrioritiesTool,
     registerListIssueStatusesTool,
+    registerListIssuesTool,
     registerListMyIssuesTool,
     registerListProjectCustomFieldsTool,
     registerListProjectMembersTool,

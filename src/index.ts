@@ -13,6 +13,8 @@ export type {
     RedmineStatus,
     RedminePriority,
     GetIssueOptions,
+    ListIssuesOptions,
+    ListIssuesResult,
     UpdateIssueData,
     CreateIssueData,
     CreateIssueRelationData,

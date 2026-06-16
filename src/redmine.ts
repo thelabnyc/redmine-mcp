@@ -362,6 +362,31 @@ export interface ListMyIssuesOptions {
     sort?: string;
 }
 
+export interface ListIssuesOptions {
+    issueIds?: Array<string | number>;
+    projectId?: string | number;
+    trackerId?: number;
+    statusId?: number | "open" | "closed" | "*";
+    assignedToId?: number | "me";
+    parentId?: number;
+    createdOn?: string;
+    updatedOn?: string;
+    customFields?: Array<{ id: number; value: string }>;
+    queryId?: number;
+    includeAttachments?: boolean;
+    includeRelations?: boolean;
+    sort?: string;
+    limit?: number;
+    offset?: number;
+}
+
+export interface ListIssuesResult {
+    issues: RedmineIssue[];
+    total_count: number;
+    offset: number;
+    limit: number;
+}
+
 export interface RedmineIssueSummary {
     id: number;
     project: RedmineProject;
@@ -818,6 +843,91 @@ export class RedmineClient {
         // Exclude api_key from response - agent doesn't need it
         const { api_key: _, ...user } = data.user;
         return user;
+    }
+
+    async listIssues(
+        options: ListIssuesOptions = {},
+    ): Promise<ListIssuesResult> {
+        const params = new URLSearchParams();
+
+        if (options.issueIds !== undefined) {
+            params.set(
+                "issue_id",
+                options.issueIds
+                    .map((issueId) => String(issueId).replace(/^#/, ""))
+                    .join(","),
+            );
+        }
+        if (options.projectId !== undefined) {
+            params.set("project_id", String(options.projectId));
+        }
+        if (options.trackerId !== undefined) {
+            params.set("tracker_id", String(options.trackerId));
+        }
+        if (options.statusId !== undefined) {
+            params.set("status_id", String(options.statusId));
+        }
+        if (options.assignedToId !== undefined) {
+            params.set("assigned_to_id", String(options.assignedToId));
+        }
+        if (options.parentId !== undefined) {
+            params.set("parent_id", String(options.parentId));
+        }
+        if (options.createdOn !== undefined) {
+            params.set("created_on", options.createdOn);
+        }
+        if (options.updatedOn !== undefined) {
+            params.set("updated_on", options.updatedOn);
+        }
+        for (const customField of options.customFields ?? []) {
+            params.set(`cf_${customField.id}`, customField.value);
+        }
+        if (options.queryId !== undefined) {
+            params.set("query_id", String(options.queryId));
+        }
+
+        const includes: string[] = [];
+        if (options.includeAttachments) includes.push("attachments");
+        if (options.includeRelations) includes.push("relations");
+        if (includes.length > 0) {
+            params.set("include", includes.join(","));
+        }
+
+        if (options.sort !== undefined) {
+            params.set("sort", options.sort);
+        }
+        if (options.limit !== undefined) {
+            params.set("limit", String(options.limit));
+        }
+        if (options.offset !== undefined) {
+            params.set("offset", String(options.offset));
+        }
+
+        const queryString = params.toString();
+        const url = `${this.config.redmineUrl}/issues.json${queryString ? `?${queryString}` : ""}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "X-Redmine-API-Key": this.config.redmineApiKey,
+                "Accept": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            const errorDetails = await this.extractErrorDetails(response);
+            throw new Error(
+                `Failed to fetch issues: ${response.status} ${response.statusText}${errorDetails}`,
+            );
+        }
+
+        const data = (await response.json()) as RedmineIssuesListResponse;
+        return {
+            issues: data.issues,
+            total_count: data.total_count,
+            offset: data.offset,
+            limit: data.limit,
+        };
     }
 
     async listMyIssues(options: ListMyIssuesOptions = {}): Promise<{
