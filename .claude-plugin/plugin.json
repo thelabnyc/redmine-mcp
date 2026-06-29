@@ -1,12 +1,14 @@
 {
     "name": "redmine-mcp",
-    "version": "0.2.0",
-    "description": "Redmine integration - fetch and update issues",
+    "version": "0.5.0",
+    "description": "Redmine MCP server and portable skill for fetching, creating, updating, searching, and triaging Redmine issues",
     "author": {
         "name": "thelab",
         "organization": "thelabnyc"
     },
     "repository": "https://gitlab.com/thelabnyc/redmine-mcp",
     "license": "ISC",
-    "keywords": ["redmine", "mcp", "project-management", "issues"]
+    "keywords": ["redmine", "mcp", "project-management", "issues", "tickets"],
+    "skills": "./skills/",
+    "mcpServers": "./.mcp.npm.json"
 }
