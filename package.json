@@ -11,7 +11,11 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist/**/*"
+    "dist/**/*",
+    ".mcp.npm.json",
+    ".claude-plugin/**/*",
+    ".codex-plugin/**/*",
+    "skills/**/*"
   ],
   "scripts": {
     "build": "tsc --noEmit false",

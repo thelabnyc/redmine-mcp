@@ -1,7 +1,7 @@
 {
     "name": "redmine-mcp",
-    "version": "0.4.0",
-    "description": "Redmine MCP server for fetching, creating, and updating issues.",
+    "version": "0.5.0",
+    "description": "Redmine MCP server and portable skill for fetching, creating, updating, searching, and triaging Redmine issues.",
     "author": {
         "name": "thelab",
         "email": "thelabdev@thelab.co",
@@ -11,11 +11,11 @@
     "license": "ISC",
     "keywords": ["redmine", "mcp", "project-management", "issues", "tickets"],
     "skills": "./skills/",
-    "mcpServers": "./.mcp.json",
+    "mcpServers": "./.mcp.npm.json",
     "interface": {
         "displayName": "Redmine MCP",
-        "shortDescription": "Fetch, create, and update Redmine issues.",
-        "longDescription": "Use the Redmine MCP server to inspect issues, list projects and metadata, create tickets, update fields, add notes, and log time.",
+        "shortDescription": "Fetch, create, update, search, and triage Redmine issues.",
+        "longDescription": "Use the Redmine MCP server to inspect issues, search Redmine, list projects and metadata, create tickets, update fields, add notes, manage attachments and relations, and log time.",
         "developerName": "thelab",
         "category": "Productivity",
         "capabilities": ["Read", "Write"],

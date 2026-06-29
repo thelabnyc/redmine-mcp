@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Agent Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents working in this repository.
 
 ## Build Commands
 
@@ -18,19 +18,22 @@ This is an MCP (Model Context Protocol) server that allows AI agents to interact
 ### Source Structure
 
 - `src/cli.ts` - CLI entry point, runs the MCP server via stdio transport
-- `src/server.ts` - MCP server setup and tool registration (`get-issue` tool)
+- `src/server.ts` - MCP server setup and tool registration
 - `src/redmine.ts` - `RedmineClient` class with typed interfaces for Redmine API responses
 - `src/config.ts` - Configuration from environment variables (`REDMINE_URL`, `REDMINE_API_KEY`)
+- `src/tools/` - Individual MCP tool registration modules
 - `src/index.ts` - Public API exports for library usage
 
 ### Testing Approach
 
-Tests use vitest with in-memory MCP transports. The pattern creates a linked client-server pair using `InMemoryTransport.createLinkedPair()` and mocks the global `fetch` to simulate Redmine API responses. See `src/server.test.ts` for examples.
+Tests use vitest with in-memory MCP transports. The pattern creates a linked client-server pair using `InMemoryTransport.createLinkedPair()` and mocks the global `fetch` to simulate Redmine API responses.
 
 ### Adding New MCP Tools
 
-Register tools in `createServer()` using `server.registerTool()` with:
+Register tools in a focused module under `src/tools/` using `server.registerTool()` with:
 
-1. Tool name (string)
-2. Tool metadata (title, description, inputSchema using zod)
+1. Tool name
+2. Tool metadata, including title, description, and `inputSchema` using Zod
 3. Handler function returning `{ content: [...] }` or `{ isError: true, content: [...] }`
+
+Export the registration function from `src/tools/index.ts` and call it from `registerAllTools()`.

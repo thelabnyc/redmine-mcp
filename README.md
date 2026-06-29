@@ -1,6 +1,6 @@
 # @thelabnyc/redmine-mcp
 
-An MCP (Model Context Protocol) server that allows AI agents like Claude to interact with Redmine project management data.
+An MCP (Model Context Protocol) server that allows MCP-capable AI agents to interact with Redmine project management data.
 
 ## Features
 
@@ -26,6 +26,22 @@ An MCP (Model Context Protocol) server that allows AI agents like Claude to inte
 npm install @thelabnyc/redmine-mcp
 ```
 
+Most MCP hosts can run the published server directly with `npx`:
+
+```bash
+npx -y @thelabnyc/redmine-mcp@0.5.0
+```
+
+To install the companion agent skill instructions in a skill-aware runtime:
+
+```bash
+npx skills add @thelabnyc/redmine-mcp
+```
+
+The skill tells the agent how to use the Redmine MCP tools safely. The MCP
+server still needs to be configured in your host and launched with
+`npx -y @thelabnyc/redmine-mcp@0.5.0`.
+
 Or clone and build from source:
 
 ```bash
@@ -37,7 +53,8 @@ npm run build
 
 ## Configuration
 
-The server requires two environment variables:
+The server requires `REDMINE_URL` and `REDMINE_API_KEY`. Attachment path and
+upload-size settings are optional:
 
 | Variable                       | Description                                                                             | Example                     |
 | ------------------------------ | --------------------------------------------------------------------------------------- | --------------------------- |
@@ -53,11 +70,24 @@ The server requires two environment variables:
 3. In the right sidebar, find **API access key**
 4. Click **Show** to reveal your key, or **Reset** to generate a new one
 
-## Usage with Claude Code
+## Usage with MCP Hosts
+
+Most MCP hosts need the same pieces:
+
+- command: `npx`
+- args: `["-y", "@thelabnyc/redmine-mcp@0.5.0"]`
+- environment: `REDMINE_URL` and `REDMINE_API_KEY`
+
+The packaged `.mcp.npm.json` uses `${REDMINE_URL}` and
+`${REDMINE_API_KEY}` placeholders for hosts that support environment-variable
+interpolation. If you copy that file into a host that does not document this
+syntax, replace the placeholders with your actual Redmine URL and API key.
+
+### Claude Code
 
 Add the server to your Claude Code configuration:
 
-### Project-level configuration
+#### Project-level configuration
 
 Create or edit `.claude/settings.json` in your project:
 
@@ -66,7 +96,7 @@ Create or edit `.claude/settings.json` in your project:
     "mcpServers": {
         "redmine": {
             "command": "npx",
-            "args": ["@thelabnyc/redmine-mcp"],
+            "args": ["-y", "@thelabnyc/redmine-mcp@0.5.0"],
             "env": {
                 "REDMINE_URL": "https://your-instance.plan.io",
                 "REDMINE_API_KEY": "your-api-key-here"
@@ -76,7 +106,7 @@ Create or edit `.claude/settings.json` in your project:
 }
 ```
 
-### User-level configuration
+#### User-level configuration
 
 Add to `~/.claude.json` to make available across all projects:
 
@@ -85,13 +115,34 @@ Add to `~/.claude.json` to make available across all projects:
     "mcpServers": {
         "redmine": {
             "command": "npx",
-            "args": ["@thelabnyc/redmine-mcp"],
+            "args": ["-y", "@thelabnyc/redmine-mcp@0.5.0"],
             "env": {
                 "REDMINE_URL": "https://your-instance.plan.io",
                 "REDMINE_API_KEY": "your-api-key-here"
             }
         }
     }
+}
+```
+
+### OpenCode
+
+Add the server to `opencode.json` or `opencode.jsonc`:
+
+```jsonc
+{
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "redmine": {
+            "type": "local",
+            "command": ["npx", "-y", "@thelabnyc/redmine-mcp@0.5.0"],
+            "enabled": true,
+            "environment": {
+                "REDMINE_URL": "https://your-instance.plan.io",
+                "REDMINE_API_KEY": "your-api-key-here",
+            },
+        },
+    },
 }
 ```
 
@@ -114,6 +165,17 @@ If you've cloned the repository:
 }
 ```
 
+The repository's `.mcp.json` is intended for this local build workflow. Plugin
+metadata that should work for normal users points at `.mcp.npm.json`, which
+launches the published package with `npx`.
+
+Plugin manifests live in `.codex-plugin/plugin.json` and
+`.claude-plugin/plugin.json`. Keep both manifests versioned together. The Codex
+manifest also carries Codex UI presentation metadata under `interface`, so it
+intentionally has Codex-only fields that the Claude manifest does not need.
+Manifest paths are plugin-root relative, so both manifests can point at shared
+package files such as `./.mcp.npm.json` and `./skills/`.
+
 ## Available Tools
 
 ### get-issue
@@ -132,7 +194,7 @@ Fetch details about a Redmine issue by ID.
 
 **Note:** Change history (journals) is always included by default.
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Look up Redmine issue #12345 and summarize the recent activity"
 
@@ -146,7 +208,7 @@ Fetch metadata for a Redmine attachment by ID.
 | -------------- | ------ | -------- | -------------------- |
 | `attachmentId` | number | Yes      | Attachment record ID |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Show me attachment 42"
 
@@ -166,7 +228,7 @@ Upload a local file to Redmine and attach it to an issue. The local file must be
 | `notes`        | string        | No       | Optional issue note to add with the upload                       |
 | `privateNotes` | boolean       | No       | Make the issue note private                                      |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Attach `/tmp/error.log` to issue #12345 as supporting evidence"
 
@@ -180,7 +242,7 @@ Download a Redmine attachment's `content_url` to a generated OS temp directory. 
 | -------------- | ------ | -------- | -------------------- |
 | `attachmentId` | number | Yes      | Attachment record ID |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Download attachment 42"
 
@@ -195,7 +257,7 @@ Update a Redmine attachment description. Callers must summarize the attachment I
 | `attachmentId` | number | Yes      | Attachment record ID       |
 | `description`  | string | Yes      | New attachment description |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Update attachment 42's description"
 
@@ -209,7 +271,7 @@ Delete a Redmine attachment by ID. Callers must summarize the attachment ID and 
 | -------------- | ------ | -------- | -------------------- |
 | `attachmentId` | number | Yes      | Attachment record ID |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Delete attachment 42"
 
@@ -223,7 +285,7 @@ List relation records for a Redmine issue. This exposes Redmine's `GET /issues/:
 | --------- | ------ | -------- | ------------------------------------------- |
 | `issueId` | string | Yes      | Source issue ID (e.g., `#12345` or `12345`) |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "List the related tickets for issue #12345"
 
@@ -237,7 +299,7 @@ Fetch one Redmine issue relation record by relation ID.
 | ------------ | ------ | -------- | ------------------ |
 | `relationId` | number | Yes      | Relation record ID |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Show me relation 1819"
 
@@ -256,7 +318,7 @@ Create a Redmine issue relation. This exposes Redmine's `POST /issues/:issue_id/
 
 Supported relation types are `relates`, `duplicates`, `duplicated`, `blocks`, `blocked`, `precedes`, `follows`, `copied_to`, and `copied_from`.
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Relate issue #12345 to issue #67890"
 
@@ -270,7 +332,7 @@ Delete a Redmine issue relation record by relation ID. Redmine does not provide 
 | ------------ | ------ | -------- | ---------------------------- |
 | `relationId` | number | Yes      | Relation record ID to delete |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Delete relation 1819"
 
@@ -285,7 +347,7 @@ Add a watcher to a Redmine issue. Callers must summarize the target issue and wa
 | `issueId` | string/number | Yes      | Issue ID (e.g., `#12345` or `12345`) |
 | `userId`  | number        | Yes      | Redmine user ID to add as a watcher  |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Add user 15 as a watcher on issue #12345"
 
@@ -300,7 +362,7 @@ Remove a watcher from a Redmine issue. Callers must summarize the target issue a
 | `issueId` | string/number | Yes      | Issue ID (e.g., `#12345` or `12345`)   |
 | `userId`  | number        | Yes      | Redmine user ID to remove as a watcher |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Remove user 15 from the watcher list for issue #12345"
 
@@ -330,7 +392,7 @@ Create a new Redmine issue.
 | `watcherUserIds` | number[]      | No       | User IDs to add as issue watchers                         |
 | `customFields`   | array         | No       | Custom field values (see [Custom Fields](#custom-fields)) |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Create a bug in project 'my-app' titled 'Login page crashes on submit'"
 
@@ -364,7 +426,7 @@ Update a Redmine issue. Can change fields, add notes, and log time spent.
 | `logSpentOn`     | string  | No       | Date for time entry (YYYY-MM-DD, defaults to today)       |
 | `customFields`   | array   | No       | Custom field values (see [Custom Fields](#custom-fields)) |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Update issue #12345 to status 2 and assign to user 5"
 >
@@ -388,7 +450,7 @@ List Redmine time entries with optional filters and pagination.
 | `limit`      | number        | No       | Maximum results to return          |
 | `offset`     | number        | No       | Number of results to skip          |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "List my time entries for project 'my-app' from 2026-06-01 to 2026-06-30"
 
@@ -402,7 +464,7 @@ Fetch one Redmine time entry by ID.
 | ------------- | ------ | -------- | ------------- |
 | `timeEntryId` | number | Yes      | Time entry ID |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Show me time entry 100"
 
@@ -422,7 +484,7 @@ Create a Redmine time entry for exactly one issue or numeric project ID. Callers
 | `comments`     | string        | No       | Time entry comments                                           |
 | `customFields` | array         | No       | Custom field values                                           |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Log 2.5 hours on issue #12345 for development today"
 
@@ -441,7 +503,7 @@ Update a Redmine time entry. Redmine returns an empty response to the update req
 | `comments`     | string | No       | Time entry comments     |
 | `customFields` | array  | No       | Custom field values     |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Update time entry 100 to 3 hours"
 
@@ -455,7 +517,7 @@ Delete a Redmine time entry by ID. Callers must summarize the time entry ID and 
 | ------------- | ------ | -------- | ------------- |
 | `timeEntryId` | number | Yes      | Time entry ID |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Delete time entry 100"
 
@@ -465,7 +527,7 @@ List Redmine time entry activities. Use this to discover activity IDs before cre
 
 **Parameters:** None.
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "List available time entry activities"
 
@@ -483,7 +545,7 @@ List issues assigned to the current user, with optional filtering and sorting.
 | `offset`    | number        | No       | Number of results to skip for pagination              |
 | `sort`      | string        | No       | Sort order (default: `priority:desc,updated_on:desc`) |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "What issues are assigned to me?"
 
@@ -511,7 +573,7 @@ List Redmine issues using general issue filters. This calls Redmine `GET /issues
 | `limit`              | number        | No       | Maximum results to return                           |
 | `offset`             | number        | No       | Number of results to skip for pagination            |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "List open bugs in project 'my-app' updated this month"
 
@@ -539,7 +601,7 @@ Search Redmine globally using `GET /search.json`. Returns `results`, `total_coun
 | `limit`       | number         | No       | Maximum results to return                                                                                  |
 | `offset`      | number         | No       | Number of results to skip for pagination                                                                   |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Search Redmine for cache invalidation across issues and wiki pages"
 
@@ -554,7 +616,7 @@ List all projects accessible to the current user.
 | `limit`   | number | No       | Maximum results to return                |
 | `offset`  | number | No       | Number of results to skip for pagination |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "What Redmine projects do I have access to?"
 
@@ -569,7 +631,7 @@ List saved Redmine issue queries visible to the current user.
 | `limit`   | number | No       | Maximum results to return                |
 | `offset`  | number | No       | Number of results to skip for pagination |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "What saved Redmine queries can I use?"
 
@@ -585,7 +647,7 @@ List all members of a Redmine project. Use this to find user IDs for assigning i
 | `limit`     | number | No       | Maximum number of members to return (default 25)     |
 | `offset`    | number | No       | Number of members to skip for pagination             |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Who can I assign issues to in project 'my-project'?"
 
@@ -599,7 +661,7 @@ List versions for a Redmine project. Use this to discover fixed version IDs befo
 | ----------- | ------------- | -------- | ---------------------------------------------- |
 | `projectId` | string/number | Yes      | Project identifier (string slug or numeric ID) |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "What versions are available for project 'my-app'?"
 
@@ -613,7 +675,7 @@ List issue categories for a Redmine project. Use this to discover category IDs b
 | ----------- | ------------- | -------- | ---------------------------------------------- |
 | `projectId` | string/number | Yes      | Project identifier (string slug or numeric ID) |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "What issue categories are available for project 'my-app'?"
 
@@ -623,7 +685,7 @@ List all available issue statuses. Use this to find valid status IDs when updati
 
 **Parameters:** None
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "What statuses can I set for issues?"
 
@@ -633,7 +695,7 @@ List all available trackers (e.g., Bug, Feature, Support). Use this to find vali
 
 **Parameters:** None
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "What trackers are available?"
 
@@ -643,7 +705,7 @@ List all available issue priorities. Use this to find valid priority IDs.
 
 **Parameters:** None
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "What priority levels can I set?"
 
@@ -657,7 +719,7 @@ List the custom fields available for issues in a given project. Use this to disc
 | ----------- | ------------- | -------- | ---------------------------------------------- |
 | `projectId` | string/number | Yes      | Project identifier (string slug or numeric ID) |
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "What custom fields are available for project 'my-app'?"
 
@@ -667,7 +729,7 @@ Get information about the currently authenticated Redmine user.
 
 **Parameters:** None
 
-**Example usage in Claude:**
+**Example prompt:**
 
 > "Who am I logged in as in Redmine?"
 
