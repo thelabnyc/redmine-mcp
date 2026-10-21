@@ -252,9 +252,9 @@ describe("search-redmine tool", () => {
                 arguments: { query: "cache", attachments: "only" },
             });
 
-            const firstCall = new URL(mockFetch.mock.calls[0]?.[0] as string);
-            const secondCall = new URL(mockFetch.mock.calls[1]?.[0] as string);
-            const thirdCall = new URL(mockFetch.mock.calls[2]?.[0] as string);
+            const firstCall = new URL(mockFetch.mock.calls[0]?.[0]);
+            const secondCall = new URL(mockFetch.mock.calls[1]?.[0]);
+            const thirdCall = new URL(mockFetch.mock.calls[2]?.[0]);
 
             expect(firstCall.searchParams.get("attachments")).toBe("1");
             expect(secondCall.searchParams.get("attachments")).toBe("0");

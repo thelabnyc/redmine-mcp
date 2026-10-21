@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 
 import type {
     GetIssueResult,
@@ -18,7 +18,9 @@ import type {
 import { createServer } from "./server.js";
 
 // Mock fetch globally
-export const mockFetch = vi.fn();
+type FetchStub = (input: string, init?: RequestInit) => Promise<unknown>;
+
+export const mockFetch: Mock<FetchStub> = vi.fn<FetchStub>();
 vi.stubGlobal("fetch", mockFetch);
 
 // Type definitions for test results
