@@ -37,6 +37,7 @@ test:
   parallel:
     matrix:
       - IMAGE: node:24
+      - IMAGE: node:26
   cache:
     key: "${CI_PROJECT_NAME}-test-${IMAGE}"
     paths:
